@@ -30,7 +30,7 @@ def test_cli_version(runner: CliRunner) -> None:
 
 @pytest.mark.parametrize(
     "cmd",
-    ["fetch", "apply", "watch", "run", "interactive", "review"],
+    ["apply", "watch", "run", "interactive", "review"],
 )
 def test_placeholder_commands(runner: CliRunner, cmd: str) -> None:
     result = runner.invoke(main, [cmd])
@@ -267,3 +267,152 @@ def test_scan_cli_nonexistent_directory(runner: CliRunner, tmp_path: Path) -> No
     result = runner.invoke(main, ["scan", str(nonexistent)])
     assert result.exit_code == 1
     assert "does not exist or is not a directory" in result.output
+
+
+def test_fetch_cli_help(runner: CliRunner) -> None:
+    result = runner.invoke(main, ["fetch", "--help"])
+    assert result.exit_code == 0
+    assert "Fetch lyrics from LRCLIB for tracks in the database." in result.output
+    assert "--dry-run" in result.output
+    assert "--force" in result.output
+    assert "--limit" in result.output
+
+
+def test_fetch_cli_dry_run(runner: CliRunner, tmp_path: Path) -> None:
+    from unittest.mock import patch
+
+    db_file = tmp_path / "fetch_dry.db"
+    cfg_file = tmp_path / "fetch_dry.yaml"
+    save_config(Config(db_path=str(db_file)), cfg_file)
+
+    with Database(db_file) as db:
+        db.upsert_track(TrackRecord(file_path="/song.mp3", track_name="Song", artist_name="Artist"))
+
+    with patch("liric.fetcher.LrclibClient.get_lyrics") as mock_get:
+        mock_get.return_value = {
+            "id": 10,
+            "trackName": "Song",
+            "artistName": "Artist",
+            "syncedLyrics": "[00:01] Hello",
+        }
+        result = runner.invoke(main, ["-c", str(cfg_file), "fetch", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "Dry-run mode" in result.output
+    assert "Fetch Summary (Dry Run)" in result.output
+    assert "Total Processed" in result.output
+    assert "Lyrics Found" in result.output
+
+    # Database track should remain pending in dry-run
+    with Database(db_file) as db:
+        track = db.get_track("/song.mp3")
+        assert track is not None
+        assert track.fetch_status == "pending"
+
+
+def test_fetch_cli_normal_run(runner: CliRunner, tmp_path: Path) -> None:
+    from unittest.mock import patch
+
+    db_file = tmp_path / "fetch_normal.db"
+    cfg_file = tmp_path / "fetch_normal.yaml"
+    save_config(Config(db_path=str(db_file)), cfg_file)
+
+    with Database(db_file) as db:
+        db.upsert_track(TrackRecord(file_path="/song.mp3", track_name="Song", artist_name="Artist"))
+
+    with patch("liric.fetcher.LrclibClient.get_lyrics") as mock_get:
+        mock_get.return_value = {
+            "id": 20,
+            "trackName": "Song",
+            "artistName": "Artist",
+            "syncedLyrics": "[00:01] Hello",
+        }
+        result = runner.invoke(main, ["-c", str(cfg_file), "fetch"])
+
+    assert result.exit_code == 0
+    assert "Fetch Summary" in result.output
+    assert "Lyrics Found" in result.output
+
+    with Database(db_file) as db:
+        track = db.get_track("/song.mp3")
+        assert track is not None
+        assert track.fetch_status == "fetched"
+        assert track.lrclib_id == 20
+        assert track.synced_lyrics == "[00:01] Hello"
+
+
+def test_fetch_cli_force(runner: CliRunner, tmp_path: Path) -> None:
+    from unittest.mock import patch
+
+    db_file = tmp_path / "fetch_force.db"
+    cfg_file = tmp_path / "fetch_force.yaml"
+    save_config(Config(db_path=str(db_file)), cfg_file)
+
+    with Database(db_file) as db:
+        # Track already has not_found status
+        db.upsert_track(
+            TrackRecord(
+                file_path="/song.mp3",
+                track_name="Song",
+                artist_name="Artist",
+                fetch_status="not_found",
+            )
+        )
+
+    with patch("liric.fetcher.LrclibClient.get_lyrics") as mock_get:
+        mock_get.return_value = {
+            "id": 30,
+            "trackName": "Song",
+            "artistName": "Artist",
+            "syncedLyrics": "[00:01] Now Found",
+        }
+        # Run without force: skips not_found track
+        res_no_force = runner.invoke(main, ["-c", str(cfg_file), "fetch"])
+        assert res_no_force.exit_code == 0
+        with Database(db_file) as db:
+            track = db.get_track("/song.mp3")
+            assert track is not None
+            assert track.fetch_status == "not_found"
+
+        # Run with force: fetches track
+        res_force = runner.invoke(main, ["-c", str(cfg_file), "fetch", "--force"])
+        assert res_force.exit_code == 0
+        with Database(db_file) as db:
+            track = db.get_track("/song.mp3")
+            assert track is not None
+            assert track.fetch_status == "fetched"
+            assert track.lrclib_id == 30
+
+
+def test_fetch_cli_limit(runner: CliRunner, tmp_path: Path) -> None:
+    from unittest.mock import patch
+
+    db_file = tmp_path / "fetch_limit.db"
+    cfg_file = tmp_path / "fetch_limit.yaml"
+    save_config(Config(db_path=str(db_file)), cfg_file)
+
+    with Database(db_file) as db:
+        for i in range(4):
+            db.upsert_track(
+                TrackRecord(
+                    file_path=f"/song_{i}.mp3",
+                    track_name=f"Song {i}",
+                    artist_name="Artist",
+                )
+            )
+
+    with patch("liric.fetcher.LrclibClient.get_lyrics") as mock_get:
+        mock_get.return_value = {
+            "id": 1,
+            "trackName": "Song",
+            "artistName": "Artist",
+            "syncedLyrics": "[00:01] Synced",
+        }
+        result = runner.invoke(main, ["-c", str(cfg_file), "fetch", "--limit", "2"])
+
+    assert result.exit_code == 0
+    with Database(db_file) as db:
+        fetched_count = db.count_tracks(status="fetched")
+        assert fetched_count == 2
+        pending_count = db.count_tracks(status="pending")
+        assert pending_count == 2

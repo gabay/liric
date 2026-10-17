@@ -15,6 +15,7 @@ from liric.config import (
     resolve_config_path,
 )
 from liric.db import Database
+from liric.fetcher import fetch_lyrics_for_library
 from liric.scanner import scan_directory
 
 console = Console()
@@ -217,9 +218,81 @@ def scan_cmd(ctx: click.Context, folder: Optional[str], dry_run: bool) -> None:
 
 
 @main.command("fetch", help="Fetch lyrics from LRCLIB for tracks in the database.")
+@click.option(
+    "--dry-run",
+    "-n",
+    is_flag=True,
+    default=False,
+    help="Show fetch results without saving to the database.",
+)
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    default=False,
+    help="Refetch already fetched or not_found tracks.",
+)
+@click.option(
+    "--limit",
+    "-l",
+    type=int,
+    default=None,
+    help="Limit number of tracks to fetch.",
+)
 @click.pass_context
-def fetch_cmd(ctx: click.Context) -> None:
-    console.print("[yellow]'fetch' is not yet implemented in Phase 1.[/yellow]")
+def fetch_cmd(
+    ctx: click.Context,
+    dry_run: bool,
+    force: bool,
+    limit: Optional[int],
+) -> None:
+    config_path = ctx.obj.get("config_path") if ctx.obj else None
+    try:
+        cfg = load_config(config_path)
+    except FileNotFoundError:
+        cfg = Config()
+
+    if dry_run:
+        console.print(
+            "[yellow]Dry-run mode: fetching lyrics without saving changes to the database...[/yellow]"
+        )
+    else:
+        console.print("[bold cyan]Fetching lyrics from LRCLIB...[/bold cyan]")
+
+    with Database(cfg.db_path) as db:
+        summary = fetch_lyrics_for_library(
+            db=db,
+            config=cfg,
+            dry_run=dry_run,
+            force=force,
+            limit=limit,
+            console=console,
+            show_progress=True,
+        )
+
+    table = Table(
+        title=f"Fetch Summary{' (Dry Run)' if dry_run else ''}",
+        show_header=True,
+        header_style="bold magenta",
+    )
+    table.add_column("Metric", style="cyan")
+    table.add_column("Count", justify="right", style="green")
+
+    table.add_row("Total Processed", str(summary.total_processed))
+    table.add_row("Lyrics Found", str(summary.found))
+    table.add_row(
+        "Not Found",
+        str(summary.not_found),
+        style="yellow" if summary.not_found > 0 else "dim",
+    )
+    table.add_row(
+        "Errors",
+        str(summary.errors),
+        style="red" if summary.errors > 0 else "dim",
+    )
+    table.add_row("Skipped", str(summary.skipped))
+
+    console.print(table)
 
 
 @main.command("apply", help="Apply downloaded lyrics to audio files (embed or .lrc files).")
