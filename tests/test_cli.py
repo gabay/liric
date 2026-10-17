@@ -28,19 +28,91 @@ def test_cli_version(runner: CliRunner) -> None:
     assert "0.1.0" in result.output
 
 
-@pytest.mark.parametrize(
-    "cmd",
-    ["interactive", "review"],
-)
-def test_placeholder_commands(runner: CliRunner, cmd: str) -> None:
-    result = runner.invoke(main, [cmd])
+def test_interactive_cli_help(runner: CliRunner) -> None:
+    result = runner.invoke(main, ["interactive", "--help"])
     assert result.exit_code == 0
-    assert "not yet implemented" in result.output
+    assert "Interactively review and resolve lyric candidate matches." in result.output
+    assert "--dry-run" in result.output
+    assert "--threshold" in result.output
+    assert "--include-not-found" in result.output
+    assert "--apply" in result.output
 
-    # Also test --help for each placeholder command
-    help_result = runner.invoke(main, [cmd, "--help"])
-    assert help_result.exit_code == 0
-    assert "Usage: liric" in help_result.output
+
+def test_review_cli_help(runner: CliRunner) -> None:
+    result = runner.invoke(main, ["review", "--help"])
+    assert result.exit_code == 0
+    assert "Review and resolve lyric candidate matches (alias of interactive)." in result.output
+    assert "--dry-run" in result.output
+    assert "--threshold" in result.output
+    assert "--include-not-found" in result.output
+    assert "--apply" in result.output
+
+
+def test_interactive_cli_dry_run(runner: CliRunner, tmp_path: Path) -> None:
+    from unittest.mock import patch
+    from liric.interactive import ReviewSummary
+
+    db_file = tmp_path / "interactive_dry.db"
+    cfg_file = tmp_path / "interactive_dry.yaml"
+    save_config(Config(db_path=str(db_file)), cfg_file)
+
+    with patch("liric.cli.review_library") as mock_review:
+        mock_review.return_value = ReviewSummary(
+            reviewed_tracks=3,
+            accepted=1,
+            marked_instrumental=1,
+            published_to_lrclib=0,
+            skipped=1,
+            rejected=0,
+        )
+        result = runner.invoke(main, ["-c", str(cfg_file), "interactive", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "Dry-run mode" in result.output
+    assert "Review Summary (Dry Run)" in result.output
+    assert "Total Reviewed" in result.output
+    assert "Accepted" in result.output
+    assert "Marked Instrumental" in result.output
+    assert "Skipped" in result.output
+    mock_review.assert_called_once()
+    _, kwargs = mock_review.call_args
+    assert kwargs["dry_run"] is True
+    assert kwargs["confidence_threshold"] == 0.85
+    assert kwargs["include_not_found"] is True
+    assert kwargs["auto_apply"] is True
+
+
+def test_review_cli_options(runner: CliRunner, tmp_path: Path) -> None:
+    from unittest.mock import patch
+    from liric.interactive import ReviewSummary
+
+    db_file = tmp_path / "review_opt.db"
+    cfg_file = tmp_path / "review_opt.yaml"
+    save_config(Config(db_path=str(db_file)), cfg_file)
+
+    with patch("liric.cli.review_library") as mock_review:
+        mock_review.return_value = ReviewSummary(reviewed_tracks=0)
+        result = runner.invoke(
+            main,
+            [
+                "-c",
+                str(cfg_file),
+                "review",
+                "-t",
+                "0.75",
+                "--no-include-not-found",
+                "--no-apply",
+            ],
+        )
+
+    assert result.exit_code == 0
+    assert "Review Summary" in result.output
+    mock_review.assert_called_once()
+    _, kwargs = mock_review.call_args
+    assert kwargs["dry_run"] is False
+    assert kwargs["confidence_threshold"] == 0.75
+    assert kwargs["include_not_found"] is False
+    assert kwargs["auto_apply"] is False
 
 
 def test_init_default(runner: CliRunner, tmp_path: Path) -> None:

@@ -17,6 +17,7 @@ from liric.config import (
 )
 from liric.db import Database
 from liric.fetcher import FetchSummary, fetch_lyrics_for_library
+from liric.interactive import ReviewSummary, review_library
 from liric.runner import PipelineSummary, run_pipeline
 from liric.scanner import ScanSummary, scan_directory
 from liric.watcher import watch_folder
@@ -112,6 +113,29 @@ def format_apply_table(summary: ApplySummary, dry_run: bool = False) -> Table:
         "Errors",
         str(summary.errors),
         style="red" if summary.errors > 0 else "dim",
+    )
+    return table
+
+
+def format_review_table(summary: ReviewSummary, dry_run: bool = False) -> Table:
+    """Format lyrics review summary table."""
+    table = Table(
+        title=f"Review Summary{' (Dry Run)' if dry_run else ''}",
+        show_header=True,
+        header_style="bold magenta",
+    )
+    table.add_column("Metric", style="cyan")
+    table.add_column("Count", justify="right", style="green")
+
+    table.add_row("Total Reviewed", str(summary.reviewed_tracks))
+    table.add_row("Accepted", str(summary.accepted))
+    table.add_row("Marked Instrumental", str(summary.marked_instrumental))
+    table.add_row("Published to LRCLIB", str(summary.published_to_lrclib))
+    table.add_row("Skipped", str(summary.skipped))
+    table.add_row(
+        "Rejected",
+        str(summary.rejected),
+        style="yellow" if summary.rejected > 0 else "dim",
     )
     return table
 
@@ -513,16 +537,116 @@ def run_cmd(
     console.print(format_apply_table(pipeline_summary.apply_summary, dry_run=dry_run))
 
 
+def _handle_interactive(
+    ctx: click.Context,
+    dry_run: bool,
+    threshold: float,
+    include_not_found: bool,
+    apply: bool,
+) -> None:
+    config_path = ctx.obj.get("config_path") if ctx.obj else None
+    try:
+        cfg = load_config(config_path)
+    except FileNotFoundError:
+        cfg = Config()
+
+    if dry_run:
+        console.print(
+            "[yellow]Dry-run mode: reviewing tracks without saving changes to files or database...[/yellow]"
+        )
+    else:
+        console.print("[bold cyan]Starting interactive lyrics review...[/bold cyan]")
+
+    with Database(cfg.db_path) as db:
+        summary = review_library(
+            db=db,
+            config=cfg,
+            dry_run=dry_run,
+            confidence_threshold=threshold,
+            include_not_found=include_not_found,
+            auto_apply=apply,
+            console=console,
+        )
+
+    console.print(format_review_table(summary, dry_run=dry_run))
+
+
 @main.command("interactive", help="Interactively review and resolve lyric candidate matches.")
+@click.option(
+    "--dry-run",
+    "-n",
+    is_flag=True,
+    default=False,
+    help="Review tracks without modifying files or database.",
+)
+@click.option(
+    "--threshold",
+    "-t",
+    type=float,
+    default=0.85,
+    show_default=True,
+    help="Confidence threshold below which tracks need review.",
+)
+@click.option(
+    "--include-not-found/--no-include-not-found",
+    default=True,
+    show_default=True,
+    help="Include tracks with 'not_found' fetch status.",
+)
+@click.option(
+    "--apply/--no-apply",
+    default=True,
+    show_default=True,
+    help="Automatically apply lyrics upon accepting candidates.",
+)
 @click.pass_context
-def interactive_cmd(ctx: click.Context) -> None:
-    console.print("[yellow]'interactive' is not yet implemented in Phase 1.[/yellow]")
+def interactive_cmd(
+    ctx: click.Context,
+    dry_run: bool,
+    threshold: float,
+    include_not_found: bool,
+    apply: bool,
+) -> None:
+    _handle_interactive(ctx, dry_run, threshold, include_not_found, apply)
 
 
 @main.command("review", help="Review and resolve lyric candidate matches (alias of interactive).")
+@click.option(
+    "--dry-run",
+    "-n",
+    is_flag=True,
+    default=False,
+    help="Review tracks without modifying files or database.",
+)
+@click.option(
+    "--threshold",
+    "-t",
+    type=float,
+    default=0.85,
+    show_default=True,
+    help="Confidence threshold below which tracks need review.",
+)
+@click.option(
+    "--include-not-found/--no-include-not-found",
+    default=True,
+    show_default=True,
+    help="Include tracks with 'not_found' fetch status.",
+)
+@click.option(
+    "--apply/--no-apply",
+    default=True,
+    show_default=True,
+    help="Automatically apply lyrics upon accepting candidates.",
+)
 @click.pass_context
-def review_cmd(ctx: click.Context) -> None:
-    console.print("[yellow]'review' is not yet implemented in Phase 1.[/yellow]")
+def review_cmd(
+    ctx: click.Context,
+    dry_run: bool,
+    threshold: float,
+    include_not_found: bool,
+    apply: bool,
+) -> None:
+    _handle_interactive(ctx, dry_run, threshold, include_not_found, apply)
 
 
 if __name__ == "__main__":
