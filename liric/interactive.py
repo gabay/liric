@@ -157,7 +157,7 @@ def review_library(
         return summary
 
     own_client = client is None
-    api_client = client or LrclibClient(api_key=config.api_key)
+    api_client = client or LrclibClient(app_id=config.app_id, api_key=config.api_key)
 
     try:
         total = len(tracks_to_review)

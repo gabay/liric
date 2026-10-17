@@ -180,7 +180,7 @@ def fetch_lyrics_for_library(
         return summary
 
     own_client = client is None
-    api_client = client or LrclibClient(api_key=config.api_key)
+    api_client = client or LrclibClient(app_id=config.app_id, api_key=config.api_key)
 
     try:
         workers = max(1, config.fetch_parallelism)

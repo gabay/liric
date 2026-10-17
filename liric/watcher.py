@@ -74,7 +74,7 @@ def process_single_file(
         return False
 
     own_client = client is None
-    api_client = client or LrclibClient(api_key=config.api_key)
+    api_client = client or LrclibClient(app_id=config.app_id, api_key=config.api_key)
 
     try:
         try:
@@ -301,7 +301,7 @@ def watch_folder(
 
     c = console or Console()
     own_client = client is None
-    api_client = client or LrclibClient(api_key=config.api_key)
+    api_client = client or LrclibClient(app_id=config.app_id, api_key=config.api_key)
 
     handler = MusicWatchHandler(
         db=db,

@@ -31,6 +31,7 @@ class Config:
     """Configuration dataclass for liric."""
 
     db_path: str = DEFAULT_DB_PATH
+    app_id: str | None = None
     api_key: str | None = None
     fetch_parallelism: int = 1
     which_lyrics: str = "prefer_synced"
@@ -81,6 +82,7 @@ def load_config(path: str | Path | None = None) -> Config:
         data = {}
     valid_keys = {
         "db_path",
+        "app_id",
         "api_key",
         "fetch_parallelism",
         "which_lyrics",
@@ -140,6 +142,14 @@ def interactive_configure(path: str | Path | None = None) -> Config:
         type=int,
     )
 
+    app_id_prompt: str = click.prompt(
+        "LRCLIB App ID (optional, press Enter to skip)",
+        default=current.app_id or "",
+        show_default=False,
+        type=str,
+    )
+    app_id = app_id_prompt.strip() or None
+
     api_key_prompt: str = click.prompt(
         "LRCLIB API key (optional, press Enter to skip)",
         default=current.api_key or "",
@@ -150,6 +160,7 @@ def interactive_configure(path: str | Path | None = None) -> Config:
 
     config = Config(
         db_path=db_path.strip(),
+        app_id=app_id,
         api_key=api_key,
         fetch_parallelism=fetch_parallelism,
         which_lyrics=which_lyrics,

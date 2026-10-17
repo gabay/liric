@@ -175,6 +175,7 @@ def test_init_interactive(runner: CliRunner, tmp_path: Path) -> None:
                 "synced_only",  # Lyrics preference
                 "both",  # Store mode
                 "3",  # Parallelism
+                "my_app_id",  # app id
                 "my_secret_key",  # API key
             ]
         )
@@ -192,6 +193,7 @@ def test_init_interactive(runner: CliRunner, tmp_path: Path) -> None:
     assert cfg.which_lyrics == "synced_only"
     assert cfg.store_mode == "both"
     assert cfg.fetch_parallelism == 3
+    assert cfg.app_id == "my_app_id"
     assert cfg.api_key == "my_secret_key"
 
 

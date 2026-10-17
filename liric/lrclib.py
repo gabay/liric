@@ -22,6 +22,7 @@ class LrclibClient:
     """Thread-safe LRCLIB HTTP API client with rate limit handling and retries."""
 
     base_url: str
+    app_id: Optional[str]
     api_key: Optional[str]
     max_retries: int
     timeout: float
@@ -33,12 +34,14 @@ class LrclibClient:
     def __init__(
         self,
         base_url: str = DEFAULT_BASE_URL,
+        app_id: Optional[str] = None,
         api_key: Optional[str] = None,
         max_retries: int = 3,
         timeout: float = 15.0,
         client: Optional[httpx.Client] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.app_id = app_id
         self.api_key = api_key
         self.max_retries = max_retries
         self.timeout = timeout
@@ -54,6 +57,8 @@ class LrclibClient:
             "User-Agent": DEFAULT_USER_AGENT,
             "Lrclib-Client": DEFAULT_LRCLIB_CLIENT,
         }
+        if self.app_id:
+            headers["Lrclib-App-Id"] = self.app_id
         if self.api_key:
             headers["Lrclib-Api-Key"] = self.api_key
         return headers

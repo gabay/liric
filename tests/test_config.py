@@ -21,6 +21,7 @@ from liric.config import (
 def test_default_config() -> None:
     config = Config()
     assert config.db_path == DEFAULT_DB_PATH
+    assert config.app_id is None
     assert config.api_key is None
     assert config.fetch_parallelism == 1
     assert config.which_lyrics == "prefer_synced"
@@ -31,6 +32,7 @@ def test_default_config() -> None:
 def test_custom_config() -> None:
     config = Config(
         db_path="/custom/path/liric.db",
+        app_id="test_app_id",
         api_key="test_api_key",
         fetch_parallelism=4,
         which_lyrics="synced_only",
@@ -38,6 +40,7 @@ def test_custom_config() -> None:
         music_dir="/media/music",
     )
     assert config.db_path == "/custom/path/liric.db"
+    assert config.app_id == "test_app_id"
     assert config.api_key == "test_api_key"
     assert config.fetch_parallelism == 4
     assert config.which_lyrics == "synced_only"
@@ -94,6 +97,7 @@ def test_save_and_load_config(tmp_path: Path) -> None:
     config_file = tmp_path / "subdir" / "config.yaml"
     original = Config(
         db_path=str(tmp_path / "test.db"),
+        app_id="lrclib_app_id",
         api_key="lrclib_secret",
         fetch_parallelism=2,
         which_lyrics="prefer_plain",
@@ -107,6 +111,7 @@ def test_save_and_load_config(tmp_path: Path) -> None:
 
     with open(config_file, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
+    assert data["app_id"] == "lrclib_app_id"
     assert data["api_key"] == "lrclib_secret"
     assert data["which_lyrics"] == "prefer_plain"
 
@@ -140,6 +145,7 @@ def test_interactive_configure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
         "Lyrics preference": "synced_only",
         "Store mode": "both",
         "Fetch parallelism (concurrency)": 3,
+        "LRCLIB App ID (optional, press Enter to skip)": "test_app_id_123",
         "LRCLIB API key (optional, press Enter to skip)": "test_api_key_123",
     }
 
@@ -155,4 +161,5 @@ def test_interactive_configure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert config.which_lyrics == "synced_only"
     assert config.store_mode == "both"
     assert config.fetch_parallelism == 3
+    assert config.app_id == "test_app_id_123"
     assert config.api_key == "test_api_key_123"
