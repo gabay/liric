@@ -19,6 +19,7 @@ from liric.db import Database
 from liric.fetcher import FetchSummary, fetch_lyrics_for_library
 from liric.runner import PipelineSummary, run_pipeline
 from liric.scanner import ScanSummary, scan_directory
+from liric.watcher import watch_folder
 
 console = Console()
 
@@ -383,9 +384,62 @@ def apply_cmd(
 
 
 @main.command("watch", help="Watch music directory for file changes and update lyrics automatically.")
+@click.argument("folder", required=False, type=click.Path(file_okay=False, dir_okay=True))
+@click.option(
+    "--dry-run",
+    "-n",
+    is_flag=True,
+    default=False,
+    help="Watch folder without modifying files or database.",
+)
+@click.option(
+    "--debounce",
+    type=float,
+    default=1.0,
+    show_default=True,
+    help="Debounce delay in seconds before processing a detected file.",
+)
 @click.pass_context
-def watch_cmd(ctx: click.Context) -> None:
-    console.print("[yellow]'watch' is not yet implemented in Phase 1.[/yellow]")
+def watch_cmd(
+    ctx: click.Context,
+    folder: Optional[str],
+    dry_run: bool,
+    debounce: float,
+) -> None:
+    config_path = ctx.obj.get("config_path") if ctx.obj else None
+    try:
+        cfg = load_config(config_path)
+    except FileNotFoundError:
+        cfg = Config()
+
+    target_str = folder or cfg.music_dir or "."
+    target_path = Path(target_str).expanduser().resolve()
+
+    if not target_path.exists() or not target_path.is_dir():
+        console.print(
+            f"[red]Error: Music directory '{target_str}' does not exist or is not a directory.[/red]"
+        )
+        ctx.exit(1)
+
+    if dry_run:
+        console.print(
+            f"[yellow]Dry-run mode: watching '{target_path}' (no changes will be saved to files or database)...[/yellow]"
+        )
+    else:
+        console.print(f"[bold cyan]Watching music directory:[/bold cyan] {target_path}")
+
+    with Database(cfg.db_path) as db:
+        try:
+            watch_folder(
+                folder=target_path,
+                db=db,
+                config=cfg,
+                dry_run=dry_run,
+                debounce_seconds=debounce,
+                console=console,
+            )
+        except KeyboardInterrupt:
+            pass
 
 
 @main.command("run", help="Run full pipeline: scan, fetch, and apply.")

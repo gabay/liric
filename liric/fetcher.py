@@ -142,6 +142,9 @@ def _process_track(
         return track, "error"
 
 
+process_track = _process_track
+
+
 def fetch_lyrics_for_library(
     db: Database,
     config: Config,

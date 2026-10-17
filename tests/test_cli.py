@@ -30,7 +30,7 @@ def test_cli_version(runner: CliRunner) -> None:
 
 @pytest.mark.parametrize(
     "cmd",
-    ["watch", "interactive", "review"],
+    ["interactive", "review"],
 )
 def test_placeholder_commands(runner: CliRunner, cmd: str) -> None:
     result = runner.invoke(main, [cmd])
@@ -615,3 +615,39 @@ def test_run_cli_normal_run(runner: CliRunner, tmp_path: Path) -> None:
         track = db.get_all_tracks()[0]
         assert track.fetch_status == "fetched"
         assert track.applied_at is not None
+
+
+def test_watch_cli_help(runner: CliRunner) -> None:
+    result = runner.invoke(main, ["watch", "--help"])
+    assert result.exit_code == 0
+    assert "Watch music directory for file changes" in result.output
+    assert "--dry-run" in result.output
+    assert "--debounce" in result.output
+
+
+def test_watch_cli_nonexistent_directory(runner: CliRunner, tmp_path: Path) -> None:
+    missing = tmp_path / "missing_watch_dir"
+    result = runner.invoke(main, ["watch", str(missing)])
+    assert result.exit_code == 1
+    assert "does not exist or is not a directory" in result.output
+
+
+def test_watch_cli_dry_run_invokes_watcher(runner: CliRunner, tmp_path: Path) -> None:
+    from unittest.mock import patch
+
+    music_dir = tmp_path / "watch_music"
+    music_dir.mkdir()
+    db_file = tmp_path / "watch.db"
+    cfg_file = tmp_path / "watch.yaml"
+    save_config(Config(db_path=str(db_file)), cfg_file)
+
+    with patch("liric.cli.watch_folder") as mock_watch:
+        result = runner.invoke(main, ["-c", str(cfg_file), "watch", str(music_dir), "--dry-run", "--debounce", "2.5"])
+
+    assert result.exit_code == 0
+    assert "Dry-run mode: watching" in result.output
+    assert mock_watch.called
+    kwargs = mock_watch.call_args.kwargs
+    assert kwargs["dry_run"] is True
+    assert kwargs["debounce_seconds"] == 2.5
+    assert kwargs["folder"] == music_dir.resolve()
