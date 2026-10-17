@@ -30,7 +30,7 @@ def test_cli_version(runner: CliRunner) -> None:
 
 @pytest.mark.parametrize(
     "cmd",
-    ["apply", "watch", "run", "interactive", "review"],
+    ["watch", "interactive", "review"],
 )
 def test_placeholder_commands(runner: CliRunner, cmd: str) -> None:
     result = runner.invoke(main, [cmd])
@@ -416,3 +416,202 @@ def test_fetch_cli_limit(runner: CliRunner, tmp_path: Path) -> None:
         assert fetched_count == 2
         pending_count = db.count_tracks(status="pending")
         assert pending_count == 2
+
+
+def test_apply_cli_help(runner: CliRunner) -> None:
+    result = runner.invoke(main, ["apply", "--help"])
+    assert result.exit_code == 0
+    assert "Apply downloaded lyrics to audio files" in result.output
+    assert "--dry-run" in result.output
+    assert "--force" in result.output
+    assert "--limit" in result.output
+
+
+def test_apply_cli_dry_run(runner: CliRunner, tmp_path: Path) -> None:
+    from tests.test_applier import create_dummy_mp3
+
+    audio_file = create_dummy_mp3(tmp_path / "song.mp3")
+    db_file = tmp_path / "apply_dry.db"
+    cfg_file = tmp_path / "apply_dry.yaml"
+    save_config(Config(db_path=str(db_file), store_mode="lrc"), cfg_file)
+
+    with Database(db_file) as db:
+        db.upsert_track(
+            TrackRecord(
+                file_path=str(audio_file),
+                track_name="Song",
+                artist_name="Artist",
+                fetch_status="fetched",
+                synced_lyrics="[00:01.00] Synced",
+            )
+        )
+
+    result = runner.invoke(main, ["-c", str(cfg_file), "apply", "--dry-run"])
+    assert result.exit_code == 0
+    assert "Dry-run mode" in result.output
+    assert "Apply Summary (Dry Run)" in result.output
+    assert "Lyrics Applied" in result.output
+
+    # Files and DB must be untouched
+    assert not (tmp_path / "song.lrc").exists()
+    with Database(db_file) as db:
+        track = db.get_track(str(audio_file))
+        assert track is not None
+        assert track.applied_at is None
+
+
+def test_apply_cli_normal_run(runner: CliRunner, tmp_path: Path) -> None:
+    from tests.test_applier import create_dummy_mp3
+
+    audio_file = create_dummy_mp3(tmp_path / "song.mp3")
+    db_file = tmp_path / "apply_normal.db"
+    cfg_file = tmp_path / "apply_normal.yaml"
+    save_config(Config(db_path=str(db_file), store_mode="lrc"), cfg_file)
+
+    with Database(db_file) as db:
+        db.upsert_track(
+            TrackRecord(
+                file_path=str(audio_file),
+                track_name="Song",
+                artist_name="Artist",
+                fetch_status="fetched",
+                synced_lyrics="[00:01.00] Synced",
+            )
+        )
+
+    result = runner.invoke(main, ["-c", str(cfg_file), "apply"])
+    assert result.exit_code == 0
+    assert "Apply Summary" in result.output
+    assert "Lyrics Applied" in result.output
+
+    # File must be created and DB updated
+    assert (tmp_path / "song.lrc").exists()
+    with Database(db_file) as db:
+        track = db.get_track(str(audio_file))
+        assert track is not None
+        assert track.applied_at is not None
+
+
+def test_apply_cli_force(runner: CliRunner, tmp_path: Path) -> None:
+    from tests.test_applier import create_dummy_mp3
+
+    audio_file = create_dummy_mp3(tmp_path / "song.mp3")
+    db_file = tmp_path / "apply_force.db"
+    cfg_file = tmp_path / "apply_force.yaml"
+    save_config(Config(db_path=str(db_file), store_mode="lrc"), cfg_file)
+
+    with Database(db_file) as db:
+        db.upsert_track(
+            TrackRecord(
+                file_path=str(audio_file),
+                track_name="Song",
+                artist_name="Artist",
+                fetch_status="fetched",
+                synced_lyrics="[00:01.00] Synced",
+                applied_at="2026-01-01T00:00:00+00:00",
+            )
+        )
+
+    # Without force: skipped
+    res_no_force = runner.invoke(main, ["-c", str(cfg_file), "apply"])
+    assert res_no_force.exit_code == 0
+    assert "Skipped" in res_no_force.output
+
+    # With force: applied
+    res_force = runner.invoke(main, ["-c", str(cfg_file), "apply", "--force"])
+    assert res_force.exit_code == 0
+    assert "Lyrics Applied" in res_force.output
+
+
+def test_apply_cli_limit(runner: CliRunner, tmp_path: Path) -> None:
+    from tests.test_applier import create_dummy_mp3
+
+    db_file = tmp_path / "apply_limit.db"
+    cfg_file = tmp_path / "apply_limit.yaml"
+    save_config(Config(db_path=str(db_file), store_mode="lrc"), cfg_file)
+
+    with Database(db_file) as db:
+        for i in range(4):
+            audio_file = create_dummy_mp3(tmp_path / f"song_{i}.mp3")
+            db.upsert_track(
+                TrackRecord(
+                    file_path=str(audio_file),
+                    track_name=f"Song {i}",
+                    artist_name="Artist",
+                    fetch_status="fetched",
+                    synced_lyrics="[00:01.00] Synced",
+                )
+            )
+
+    result = runner.invoke(main, ["-c", str(cfg_file), "apply", "--limit", "2"])
+    assert result.exit_code == 0
+    assert "Lyrics Applied" in result.output
+
+    with Database(db_file) as db:
+        applied_count = sum(1 for t in db.get_all_tracks() if t.applied_at is not None)
+        assert applied_count == 2
+
+
+def test_run_cli_help(runner: CliRunner) -> None:
+    result = runner.invoke(main, ["run", "--help"])
+    assert result.exit_code == 0
+    assert "Run full pipeline: scan, fetch, and apply." in result.output
+    assert "--dry-run" in result.output
+    assert "--force" in result.output
+    assert "--limit" in result.output
+
+
+def test_run_cli_dry_run(runner: CliRunner, tmp_path: Path) -> None:
+    from tests.test_applier import create_dummy_mp3
+
+    music_dir = tmp_path / "music"
+    create_dummy_mp3(music_dir / "Artist - Song.mp3")
+
+    db_file = tmp_path / "run_dry.db"
+    cfg_file = tmp_path / "run_dry.yaml"
+    save_config(Config(db_path=str(db_file)), cfg_file)
+
+    result = runner.invoke(main, ["-c", str(cfg_file), "run", str(music_dir), "--dry-run"])
+    assert result.exit_code == 0
+    assert "Dry-run mode" in result.output
+    assert "Scan Summary (Dry Run)" in result.output
+    assert "Fetch Summary (Dry Run)" in result.output
+    assert "Apply Summary (Dry Run)" in result.output
+
+    with Database(db_file) as db:
+        assert db.count_tracks() == 0
+
+
+def test_run_cli_normal_run(runner: CliRunner, tmp_path: Path) -> None:
+    from unittest.mock import patch
+    from tests.test_applier import create_dummy_mp3
+
+    music_dir = tmp_path / "music"
+    create_dummy_mp3(music_dir / "Artist - RunSong.mp3")
+
+    db_file = tmp_path / "run_normal.db"
+    cfg_file = tmp_path / "run_normal.yaml"
+    save_config(Config(db_path=str(db_file), store_mode="both"), cfg_file)
+
+    with patch("liric.fetcher.LrclibClient.get_lyrics") as mock_get:
+        mock_get.return_value = {
+            "id": 99,
+            "trackName": "RunSong",
+            "artistName": "Artist",
+            "syncedLyrics": "[00:01.00] Run Synced",
+        }
+        result = runner.invoke(main, ["-c", str(cfg_file), "run", str(music_dir)])
+
+    assert result.exit_code == 0
+    assert "Scan Summary" in result.output
+    assert "Fetch Summary" in result.output
+    assert "Apply Summary" in result.output
+    assert "Pipeline Execution Completed" in result.output
+
+    # Check sidecar created
+    assert (music_dir / "Artist - RunSong.lrc").exists()
+    with Database(db_file) as db:
+        assert db.count_tracks() == 1
+        track = db.get_all_tracks()[0]
+        assert track.fetch_status == "fetched"
+        assert track.applied_at is not None

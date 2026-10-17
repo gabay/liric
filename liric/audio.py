@@ -112,15 +112,18 @@ def _find_tag_text(tags: Any, candidates: list[str]) -> str | None:
     if tags is None or not hasattr(tags, "get"):
         return None
     for cand in candidates:
-        val = tags.get(cand)
-        if val is None:
-            val = tags.get(cand.lower())
-        if val is None:
-            val = tags.get(cand.upper())
-        if val is not None:
-            txt = _extract_tag_text(val)
-            if txt:
-                return txt
+        try:
+            val = tags.get(cand)
+            if val is None:
+                val = tags.get(cand.lower())
+            if val is None:
+                val = tags.get(cand.upper())
+            if val is not None:
+                txt = _extract_tag_text(val)
+                if txt:
+                    return txt
+        except (KeyError, ValueError):
+            continue
     return None
 
 
@@ -171,21 +174,27 @@ def _inspect_embedded_lyrics(tags: Any) -> tuple[bool, bool, bool]:
 
     # 2. MP4 / M4A tags (\xa9lyr)
     if hasattr(tags, "get"):
-        lyr = tags.get("\xa9lyr")
-        if lyr:
-            text = "\n".join(lyr) if isinstance(lyr, list) else str(lyr)
-            if text.strip():
-                is_embedded = True
-                if is_synced_lrc_content(text):
-                    has_synced = True
-                if _has_text_lines(text) or not is_synced_lrc_content(text):
-                    has_plain = True
+        try:
+            lyr = tags.get("\xa9lyr")
+            if lyr:
+                text = "\n".join(lyr) if isinstance(lyr, list) else str(lyr)
+                if text.strip():
+                    is_embedded = True
+                    if is_synced_lrc_content(text):
+                        has_synced = True
+                    if _has_text_lines(text) or not is_synced_lrc_content(text):
+                        has_plain = True
+        except (KeyError, ValueError):
+            pass
 
     # 3. Vorbis tags (FLAC/OGG/Opus) & ASF / WMA & generic dict tags
     if hasattr(tags, "get"):
         # Synced lyrics tag
         for key in ("syncedlyrics", "SYNCEDLYRICS", "WM/Lyrics_Synchronised"):
-            val = tags.get(key)
+            try:
+                val = tags.get(key)
+            except (KeyError, ValueError):
+                val = None
             if val:
                 text = "\n".join(val) if isinstance(val, list) else str(val)
                 if text.strip():
@@ -197,7 +206,10 @@ def _inspect_embedded_lyrics(tags: Any) -> tuple[bool, bool, bool]:
 
         # Unsynced lyrics tag
         for key in ("unsyncedlyrics", "UNSYNCEDLYRICS"):
-            val = tags.get(key)
+            try:
+                val = tags.get(key)
+            except (KeyError, ValueError):
+                val = None
             if val:
                 text = "\n".join(val) if isinstance(val, list) else str(val)
                 if text.strip():
@@ -210,7 +222,10 @@ def _inspect_embedded_lyrics(tags: Any) -> tuple[bool, bool, bool]:
 
         # General lyrics tag
         for key in ("lyrics", "LYRICS", "WM/Lyrics", "Lyrics"):
-            val = tags.get(key)
+            try:
+                val = tags.get(key)
+            except (KeyError, ValueError):
+                val = None
             if val:
                 text = "\n".join(val) if isinstance(val, list) else str(val)
                 if text.strip():

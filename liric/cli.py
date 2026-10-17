@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.table import Table
 
 from liric import __version__
+from liric.applier import ApplySummary, apply_lyrics_to_library
 from liric.config import (
     Config,
     create_default_config,
@@ -15,8 +16,9 @@ from liric.config import (
     resolve_config_path,
 )
 from liric.db import Database
-from liric.fetcher import fetch_lyrics_for_library
-from liric.scanner import scan_directory
+from liric.fetcher import FetchSummary, fetch_lyrics_for_library
+from liric.runner import PipelineSummary, run_pipeline
+from liric.scanner import ScanSummary, scan_directory
 
 console = Console()
 
@@ -34,6 +36,83 @@ def main(ctx: click.Context, config: Optional[str]) -> None:
     """liric - Music library lyrics enrichment CLI tool."""
     ctx.ensure_object(dict)
     ctx.obj["config_path"] = config
+
+
+def format_scan_table(summary: ScanSummary, dry_run: bool = False) -> Table:
+    """Format library scan summary table."""
+    table = Table(
+        title=f"Scan Summary{' (Dry Run)' if dry_run else ''}",
+        show_header=True,
+        header_style="bold magenta",
+    )
+    table.add_column("Metric", style="cyan")
+    table.add_column("Count", justify="right", style="green")
+
+    table.add_row("Total Scanned", str(summary.total_scanned))
+    table.add_row("New Tracks", str(summary.new_tracks))
+    table.add_row("Updated Tracks", str(summary.updated_tracks))
+    table.add_row("Unchanged Tracks", str(summary.unchanged_tracks))
+    table.add_row(
+        "Failed Files",
+        str(summary.failed_files),
+        style="red" if summary.failed_files > 0 else "dim",
+    )
+    table.add_section()
+    table.add_row("With Synced Lyrics", str(summary.with_synced))
+    table.add_row("With Plain Lyrics", str(summary.with_plain))
+    table.add_row(
+        "With No Lyrics",
+        str(summary.with_no_lyrics),
+        style="yellow" if summary.with_no_lyrics > 0 else "green",
+    )
+    return table
+
+
+def format_fetch_table(summary: FetchSummary, dry_run: bool = False) -> Table:
+    """Format lyrics fetch summary table."""
+    table = Table(
+        title=f"Fetch Summary{' (Dry Run)' if dry_run else ''}",
+        show_header=True,
+        header_style="bold magenta",
+    )
+    table.add_column("Metric", style="cyan")
+    table.add_column("Count", justify="right", style="green")
+
+    table.add_row("Total Processed", str(summary.total_processed))
+    table.add_row("Lyrics Found", str(summary.found))
+    table.add_row(
+        "Not Found",
+        str(summary.not_found),
+        style="yellow" if summary.not_found > 0 else "dim",
+    )
+    table.add_row(
+        "Errors",
+        str(summary.errors),
+        style="red" if summary.errors > 0 else "dim",
+    )
+    table.add_row("Skipped", str(summary.skipped))
+    return table
+
+
+def format_apply_table(summary: ApplySummary, dry_run: bool = False) -> Table:
+    """Format lyrics apply summary table."""
+    table = Table(
+        title=f"Apply Summary{' (Dry Run)' if dry_run else ''}",
+        show_header=True,
+        header_style="bold magenta",
+    )
+    table.add_column("Metric", style="cyan")
+    table.add_column("Count", justify="right", style="green")
+
+    table.add_row("Total Processed", str(summary.total_processed))
+    table.add_row("Lyrics Applied", str(summary.applied))
+    table.add_row("Skipped", str(summary.skipped))
+    table.add_row(
+        "Errors",
+        str(summary.errors),
+        style="red" if summary.errors > 0 else "dim",
+    )
+    return table
 
 
 def _handle_init(
@@ -188,33 +267,7 @@ def scan_cmd(ctx: click.Context, folder: Optional[str], dry_run: bool) -> None:
             show_progress=True,
         )
 
-    table = Table(
-        title=f"Scan Summary{' (Dry Run)' if dry_run else ''}",
-        show_header=True,
-        header_style="bold magenta",
-    )
-    table.add_column("Metric", style="cyan")
-    table.add_column("Count", justify="right", style="green")
-
-    table.add_row("Total Scanned", str(summary.total_scanned))
-    table.add_row("New Tracks", str(summary.new_tracks))
-    table.add_row("Updated Tracks", str(summary.updated_tracks))
-    table.add_row("Unchanged Tracks", str(summary.unchanged_tracks))
-    table.add_row(
-        "Failed Files",
-        str(summary.failed_files),
-        style="red" if summary.failed_files > 0 else "dim",
-    )
-    table.add_section()
-    table.add_row("With Synced Lyrics", str(summary.with_synced))
-    table.add_row("With Plain Lyrics", str(summary.with_plain))
-    table.add_row(
-        "With No Lyrics",
-        str(summary.with_no_lyrics),
-        style="yellow" if summary.with_no_lyrics > 0 else "green",
-    )
-
-    console.print(table)
+    console.print(format_scan_table(summary, dry_run=dry_run))
 
 
 @main.command("fetch", help="Fetch lyrics from LRCLIB for tracks in the database.")
@@ -270,35 +323,63 @@ def fetch_cmd(
             show_progress=True,
         )
 
-    table = Table(
-        title=f"Fetch Summary{' (Dry Run)' if dry_run else ''}",
-        show_header=True,
-        header_style="bold magenta",
-    )
-    table.add_column("Metric", style="cyan")
-    table.add_column("Count", justify="right", style="green")
-
-    table.add_row("Total Processed", str(summary.total_processed))
-    table.add_row("Lyrics Found", str(summary.found))
-    table.add_row(
-        "Not Found",
-        str(summary.not_found),
-        style="yellow" if summary.not_found > 0 else "dim",
-    )
-    table.add_row(
-        "Errors",
-        str(summary.errors),
-        style="red" if summary.errors > 0 else "dim",
-    )
-    table.add_row("Skipped", str(summary.skipped))
-
-    console.print(table)
+    console.print(format_fetch_table(summary, dry_run=dry_run))
 
 
 @main.command("apply", help="Apply downloaded lyrics to audio files (embed or .lrc files).")
+@click.option(
+    "--dry-run",
+    "-n",
+    is_flag=True,
+    default=False,
+    help="Show apply results without modifying files or database.",
+)
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    default=False,
+    help="Re-apply lyrics to already applied tracks.",
+)
+@click.option(
+    "--limit",
+    "-l",
+    type=int,
+    default=None,
+    help="Limit number of tracks to apply.",
+)
 @click.pass_context
-def apply_cmd(ctx: click.Context) -> None:
-    console.print("[yellow]'apply' is not yet implemented in Phase 1.[/yellow]")
+def apply_cmd(
+    ctx: click.Context,
+    dry_run: bool,
+    force: bool,
+    limit: Optional[int],
+) -> None:
+    config_path = ctx.obj.get("config_path") if ctx.obj else None
+    try:
+        cfg = load_config(config_path)
+    except FileNotFoundError:
+        cfg = Config()
+
+    if dry_run:
+        console.print(
+            "[yellow]Dry-run mode: applying lyrics without modifying files or database...[/yellow]"
+        )
+    else:
+        console.print("[bold cyan]Applying lyrics to music library...[/bold cyan]")
+
+    with Database(cfg.db_path) as db:
+        summary = apply_lyrics_to_library(
+            db=db,
+            config=cfg,
+            dry_run=dry_run,
+            force=force,
+            limit=limit,
+            console=console,
+            show_progress=True,
+        )
+
+    console.print(format_apply_table(summary, dry_run=dry_run))
 
 
 @main.command("watch", help="Watch music directory for file changes and update lyrics automatically.")
@@ -308,9 +389,74 @@ def watch_cmd(ctx: click.Context) -> None:
 
 
 @main.command("run", help="Run full pipeline: scan, fetch, and apply.")
+@click.argument("folder", required=False, type=click.Path(file_okay=False, dir_okay=True))
+@click.option(
+    "--dry-run",
+    "-n",
+    is_flag=True,
+    default=False,
+    help="Run pipeline without saving changes to files or database.",
+)
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    default=False,
+    help="Force refetch and reapply to already processed tracks.",
+)
+@click.option(
+    "--limit",
+    "-l",
+    type=int,
+    default=None,
+    help="Limit number of tracks to fetch and apply.",
+)
 @click.pass_context
-def run_cmd(ctx: click.Context) -> None:
-    console.print("[yellow]'run' is not yet implemented in Phase 1.[/yellow]")
+def run_cmd(
+    ctx: click.Context,
+    folder: Optional[str],
+    dry_run: bool,
+    force: bool,
+    limit: Optional[int],
+) -> None:
+    config_path = ctx.obj.get("config_path") if ctx.obj else None
+    try:
+        cfg = load_config(config_path)
+    except FileNotFoundError:
+        cfg = Config()
+
+    target_str = folder or cfg.music_dir or "."
+    target_path = Path(target_str).expanduser().resolve()
+
+    if not target_path.exists() or not target_path.is_dir():
+        console.print(
+            f"[red]Error: Music directory '{target_str}' does not exist or is not a directory.[/red]"
+        )
+        ctx.exit(1)
+
+    if dry_run:
+        console.print(
+            f"[yellow]Dry-run mode: executing pipeline on '{target_path}' (no changes will be saved)...[/yellow]"
+        )
+    else:
+        console.print(f"[bold cyan]Running lyrics pipeline on:[/bold cyan] {target_path}")
+
+    with Database(cfg.db_path) as db:
+        pipeline_summary = run_pipeline(
+            folder=target_path,
+            db=db,
+            config=cfg,
+            dry_run=dry_run,
+            force=force,
+            limit=limit,
+            console=console,
+            show_progress=True,
+        )
+
+    console.print("\n[bold green]Pipeline Execution Completed[/bold green]\n")
+    console.print(format_scan_table(pipeline_summary.scan_summary, dry_run=dry_run))
+    console.print(format_fetch_table(pipeline_summary.fetch_summary, dry_run=dry_run))
+    console.print(format_apply_table(pipeline_summary.apply_summary, dry_run=dry_run))
 
 
 @main.command("interactive", help="Interactively review and resolve lyric candidate matches.")
