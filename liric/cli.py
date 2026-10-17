@@ -1,0 +1,190 @@
+"""Command line interface for liric."""
+
+from pathlib import Path
+from typing import Optional
+import click
+from rich.console import Console
+
+from liric import __version__
+from liric.config import (
+    Config,
+    create_default_config,
+    interactive_configure,
+    load_config,
+    resolve_config_path,
+)
+from liric.db import Database
+
+console = Console()
+
+
+@click.group("liric")
+@click.option(
+    "--config",
+    "-c",
+    type=click.Path(dir_okay=False),
+    help="Path to config file.",
+)
+@click.version_option(version=__version__, prog_name="liric")
+@click.pass_context
+def main(ctx: click.Context, config: Optional[str]) -> None:
+    """liric - Music library lyrics enrichment CLI tool."""
+    ctx.ensure_object(dict)
+    ctx.obj["config_path"] = config
+
+
+def _handle_init(
+    ctx: click.Context, interactive: bool, force: bool
+) -> None:
+    config_path = ctx.obj.get("config_path") if ctx.obj else None
+    target = resolve_config_path(config_path)
+
+    if target.exists() and not force and not interactive:
+        console.print(
+            f"[yellow]Configuration file already exists at {target}. Use --force to overwrite or --interactive to reconfigure.[/yellow]"
+        )
+        return
+
+    if interactive:
+        console.print(f"[bold blue]Configuring liric ({target})...[/bold blue]")
+        interactive_configure(target)
+        console.print(f"[green]Configuration saved to {target}[/green]")
+    else:
+        create_default_config(target)
+        console.print(f"[green]Default configuration created at {target}[/green]")
+
+
+@main.command("init", help="Initialize configuration file (default or interactive).")
+@click.option(
+    "--interactive",
+    "-i",
+    is_flag=True,
+    default=False,
+    help="Run interactive configuration prompt.",
+)
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    default=False,
+    help="Overwrite existing configuration file.",
+)
+@click.pass_context
+def init_cmd(ctx: click.Context, interactive: bool, force: bool) -> None:
+    _handle_init(ctx, interactive, force)
+
+
+@main.command("configure", help="Configure liric settings (alias of init).")
+@click.option(
+    "--interactive",
+    "-i",
+    is_flag=True,
+    default=False,
+    help="Run interactive configuration prompt.",
+)
+@click.option(
+    "--force",
+    "-f",
+    is_flag=True,
+    default=False,
+    help="Overwrite existing configuration file.",
+)
+@click.pass_context
+def configure_cmd(ctx: click.Context, interactive: bool, force: bool) -> None:
+    _handle_init(ctx, interactive, force)
+
+
+@main.command("clean", help="Clean database state.")
+@click.option(
+    "--dry-run",
+    "-n",
+    is_flag=True,
+    default=False,
+    help="Show how many tracks would be cleaned without modifying database.",
+)
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    default=False,
+    help="Confirm deletion without prompting.",
+)
+@click.pass_context
+def clean_cmd(ctx: click.Context, dry_run: bool, yes: bool) -> None:
+    config_path = ctx.obj.get("config_path") if ctx.obj else None
+    try:
+        cfg = load_config(config_path)
+    except FileNotFoundError:
+        cfg = Config()
+
+    with Database(cfg.db_path) as db:
+        if dry_run:
+            count = db.clean(dry_run=True)
+            console.print(
+                f"[yellow]Dry run: {count} track(s) would be removed from the database.[/yellow]"
+            )
+            return
+
+        count = db.count_tracks()
+        if count == 0:
+            console.print("[dim]Database is already empty (0 tracks).[/dim]")
+            return
+
+        if not yes:
+            if not click.confirm(
+                f"Are you sure you want to remove {count} track(s) from the database?"
+            ):
+                console.print("[yellow]Clean operation aborted.[/yellow]")
+                return
+
+        deleted = db.clean(dry_run=False)
+        console.print(
+            f"[green]Successfully removed {deleted} track(s) from the database.[/green]"
+        )
+
+
+# Scaffolding placeholder commands
+@main.command("scan", help="Scan music directory for audio files and populate database.")
+@click.pass_context
+def scan_cmd(ctx: click.Context) -> None:
+    console.print("[yellow]'scan' is not yet implemented in Phase 1.[/yellow]")
+
+
+@main.command("fetch", help="Fetch lyrics from LRCLIB for tracks in the database.")
+@click.pass_context
+def fetch_cmd(ctx: click.Context) -> None:
+    console.print("[yellow]'fetch' is not yet implemented in Phase 1.[/yellow]")
+
+
+@main.command("apply", help="Apply downloaded lyrics to audio files (embed or .lrc files).")
+@click.pass_context
+def apply_cmd(ctx: click.Context) -> None:
+    console.print("[yellow]'apply' is not yet implemented in Phase 1.[/yellow]")
+
+
+@main.command("watch", help="Watch music directory for file changes and update lyrics automatically.")
+@click.pass_context
+def watch_cmd(ctx: click.Context) -> None:
+    console.print("[yellow]'watch' is not yet implemented in Phase 1.[/yellow]")
+
+
+@main.command("run", help="Run full pipeline: scan, fetch, and apply.")
+@click.pass_context
+def run_cmd(ctx: click.Context) -> None:
+    console.print("[yellow]'run' is not yet implemented in Phase 1.[/yellow]")
+
+
+@main.command("interactive", help="Interactively review and resolve lyric candidate matches.")
+@click.pass_context
+def interactive_cmd(ctx: click.Context) -> None:
+    console.print("[yellow]'interactive' is not yet implemented in Phase 1.[/yellow]")
+
+
+@main.command("review", help="Review and resolve lyric candidate matches (alias of interactive).")
+@click.pass_context
+def review_cmd(ctx: click.Context) -> None:
+    console.print("[yellow]'review' is not yet implemented in Phase 1.[/yellow]")
+
+
+if __name__ == "__main__":
+    main()

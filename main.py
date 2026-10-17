@@ -1,6 +1,4 @@
-def main():
-    print("Hello from liric!")
-
+from liric.cli import main
 
 if __name__ == "__main__":
     main()
