@@ -1,6 +1,6 @@
 # liric 🎵
 
-[![Python](https://img.shields.io/badge/python-3.13%2B-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.14%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg?logo=docker&logoColor=white)](Dockerfile)
 [![API](https://img.shields.io/badge/lyrics%20provider-LRCLIB-orange.svg)](https://lrclib.net/)
@@ -70,7 +70,7 @@ It recursively scans your audio files, checks for existing synchronized or plain
 - **Universal Dry-Run Mode:**
   - Full support for `-n` / `--dry-run` across every single command to preview actions without modifying files or the database.
 - **Lightweight Docker Container:**
-  - Minimal Python 3.13-slim multi-stage image (~150 MB).
+  - Minimal Python 3.14-slim multi-stage image (~150 MB).
   - Operates as a non-root user (`appuser`, UID 1000) with volume mounts for `/music` and `/config`.
 
 ---
@@ -130,7 +130,7 @@ uv run liric --help
 
 ### Using pip
 
-Ensure Python 3.13 or newer is installed:
+Ensure Python 3.14 or newer is installed:
 
 ```bash
 pip install .

@@ -1,5 +1,5 @@
 # Multi-stage build for liric CLI tool
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir .
 
 # Final minimal production image
-FROM python:3.13-slim AS final
+FROM python:3.14-slim AS final
 
 # Create non-root system user and group
 RUN groupadd -r -g 1000 appuser && \
