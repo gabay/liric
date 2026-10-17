@@ -1,0 +1,18 @@
+services:
+  liric:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: liric:latest
+    container_name: liric
+    restart: unless-stopped
+    user: "1000:1000"
+    volumes:
+      # Mount your host music directory (read/write if embedding or creating .lrc sidecars)
+      - ./music:/music
+      # Mount persistent config and SQLite database directory
+      - ./config:/config
+    # Default to watching the music library for newly added or modified tracks
+    command: ["watch", "/music"]
+    # Alternative one-off execution:
+    # command: ["run", "/music"]

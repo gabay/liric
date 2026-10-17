@@ -105,10 +105,14 @@ dependencies = [
     { name = "click" },
     { name = "httpx" },
     { name = "mutagen" },
-    { name = "pytest" },
     { name = "pyyaml" },
     { name = "rich" },
     { name = "watchdog" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
 ]
 
 [package.metadata]
@@ -116,11 +120,13 @@ requires-dist = [
     { name = "click", specifier = ">=8.5.0" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "mutagen", specifier = ">=1.48.1" },
-    { name = "pytest", specifier = ">=9.1.1" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "rich", specifier = ">=15.0.0" },
     { name = "watchdog", specifier = ">=6.0.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.1.1" }]
 
 [[package]]
 name = "markdown-it-py"
