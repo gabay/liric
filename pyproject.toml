@@ -2,8 +2,7 @@
 name = "liric"
 version = "0.1.0"
 description = "Music library lyrics enrichment CLI tool"
-readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = [
     "click>=8.5.0",
     "httpx>=0.28.1",
@@ -16,6 +15,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "ruff>=0.17.1",
 ]
 
 [project.scripts]
@@ -28,3 +28,11 @@ build-backend = "hatchling.build"
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]

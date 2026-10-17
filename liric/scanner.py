@@ -58,10 +58,7 @@ def _process_audio_file(
             db.upsert_track(meta.to_track_record())
     else:
         # Check if mtime and size match
-        mtime_matches = (
-            existing.file_mtime is not None
-            and abs(existing.file_mtime - meta.file_mtime) < 1e-4
-        )
+        mtime_matches = existing.file_mtime is not None and abs(existing.file_mtime - meta.file_mtime) < 1e-4
         size_matches = existing.file_size == meta.file_size
         lyrics_matches = (
             existing.has_synced == meta.has_synced

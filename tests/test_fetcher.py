@@ -2,7 +2,6 @@
 
 from pathlib import Path
 from typing import Any, Optional
-import pytest
 
 from liric.config import Config
 from liric.db import Database, TrackRecord
@@ -35,12 +34,14 @@ class DummyLrclibClient(LrclibClient):
         album_name: Optional[str] = None,
         duration: Optional[float] = None,
     ) -> Optional[dict[str, Any]]:
-        self.get_calls.append({
-            "track_name": track_name,
-            "artist_name": artist_name,
-            "album_name": album_name,
-            "duration": duration,
-        })
+        self.get_calls.append(
+            {
+                "track_name": track_name,
+                "artist_name": artist_name,
+                "album_name": album_name,
+                "duration": duration,
+            }
+        )
         if self.raise_on_get:
             raise RuntimeError("Simulated API failure on get_lyrics")
         return self.exact_return
@@ -52,12 +53,14 @@ class DummyLrclibClient(LrclibClient):
         album_name: Optional[str] = None,
         q: Optional[str] = None,
     ) -> list[dict[str, Any]]:
-        self.search_calls.append({
-            "track_name": track_name,
-            "artist_name": artist_name,
-            "album_name": album_name,
-            "q": q,
-        })
+        self.search_calls.append(
+            {
+                "track_name": track_name,
+                "artist_name": artist_name,
+                "album_name": album_name,
+                "q": q,
+            }
+        )
         if self.raise_on_search:
             raise RuntimeError("Simulated API failure on search_lyrics")
         return self.search_return

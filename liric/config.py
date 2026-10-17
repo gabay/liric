@@ -3,6 +3,7 @@
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
 import click
 import yaml
 
@@ -38,17 +39,11 @@ class Config:
 
     def __post_init__(self) -> None:
         if self.which_lyrics not in ALLOWED_WHICH_LYRICS:
-            raise ValueError(
-                f"Invalid which_lyrics: '{self.which_lyrics}'. Allowed: {', '.join(ALLOWED_WHICH_LYRICS)}"
-            )
+            raise ValueError(f"Invalid which_lyrics: '{self.which_lyrics}'. Allowed: {', '.join(ALLOWED_WHICH_LYRICS)}")
         if self.store_mode not in ALLOWED_STORE_MODES:
-            raise ValueError(
-                f"Invalid store_mode: '{self.store_mode}'. Allowed: {', '.join(ALLOWED_STORE_MODES)}"
-            )
+            raise ValueError(f"Invalid store_mode: '{self.store_mode}'. Allowed: {', '.join(ALLOWED_STORE_MODES)}")
         if not isinstance(self.fetch_parallelism, int) or self.fetch_parallelism < 1:
-            raise ValueError(
-                f"fetch_parallelism must be a positive integer, got: {self.fetch_parallelism}"
-            )
+            raise ValueError(f"fetch_parallelism must be a positive integer, got: {self.fetch_parallelism}")
 
     @property
     def expanded_db_path(self) -> Path:

@@ -486,6 +486,24 @@ CREATE INDEX idx_tracks_fetch_status ON tracks(fetch_status);
 
 ---
 
+## Development & Makefile
+
+A `Makefile` is provided with targets for common development, testing, and containerization tasks:
+
+| Target | Description |
+|---|---|
+| `make install` | Install project and dependencies into local virtual environment with `uv` |
+| `make lint` | Run linter checks with `ruff` |
+| `make format` | Automatically reformat code and fix lint issues |
+| `make check` | Run format checks and lint checks together |
+| `make test` | Run complete unit and integration test suite with `pytest` |
+| `make run` | Execute the full pipeline (`scan` + `fetch` + `apply`) |
+| `make docker-build` | Build the minimal Docker image (`liric:latest`) |
+| `make docker-run` | Run the container with interactive shell and volume mounts |
+| `make clean` | Clean build artifacts, Python bytecache, and test caches |
+
+---
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

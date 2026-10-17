@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import mutagen
 from mutagen.flac import FLAC
 from mutagen.id3 import ID3, TXXX, USLT
 from mutagen.mp3 import MP3
@@ -12,7 +13,6 @@ from mutagen.mp4 import MP4
 from mutagen.ogg import OggFileType
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
-import mutagen
 from rich.console import Console
 from rich.progress import (
     BarColumn,

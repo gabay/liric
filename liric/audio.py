@@ -1,8 +1,8 @@
 """Audio file metadata and lyrics state extraction using mutagen."""
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
-import re
 from typing import Any, Optional
 
 import mutagen

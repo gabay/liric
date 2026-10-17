@@ -2,6 +2,7 @@
 
 from collections.abc import Generator
 from pathlib import Path
+
 import pytest
 
 from liric.db import Database, TrackRecord
@@ -20,9 +21,7 @@ def test_table_and_index_creation(db: Database) -> None:
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tracks'")
     assert cursor.fetchone() is not None
 
-    cursor.execute(
-        "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_tracks_fetch_status'"
-    )
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='idx_tracks_fetch_status'")
     assert cursor.fetchone() is not None
 
 

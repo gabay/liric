@@ -1,7 +1,6 @@
 """LRCLIB API client with rate limiting, retry backoff, and challenge solver."""
 
 import hashlib
-from pathlib import Path
 import threading
 import time
 from typing import Any, Optional
@@ -152,7 +151,7 @@ class LrclibClient:
         duration: Optional[float] = None,
     ) -> Optional[dict[str, Any]]:
         """Fetch exact lyrics for a track.
-        
+
         Calls GET /api/get. Returns dict if found (200), or None if not found (404).
         """
         params: dict[str, Any] = {
@@ -179,7 +178,7 @@ class LrclibClient:
         q: Optional[str] = None,
     ) -> list[dict[str, Any]]:
         """Search lyrics candidates.
-        
+
         Calls GET /api/search. Returns list of candidate dicts.
         """
         params: dict[str, Any] = {}
@@ -201,7 +200,7 @@ class LrclibClient:
 
     def request_challenge(self) -> dict[str, str]:
         """Request a proof-of-work challenge for publishing lyrics.
-        
+
         Calls POST /api/request-challenge. Returns dict with prefix and target.
         """
         response = self._request("POST", "/api/request-challenge")
@@ -214,7 +213,7 @@ class LrclibClient:
     @staticmethod
     def solve_challenge(prefix: str, target: str) -> str:
         """Solve a proof-of-work challenge.
-        
+
         Iterates nonce=0,1,2... until sha256(prefix + str(nonce)) <= target bytes.
         Returns nonce as string.
         """
@@ -229,7 +228,7 @@ class LrclibClient:
 
     def publish_lyrics(self, payload: dict[str, Any], prefix: str, nonce: str) -> bool:
         """Publish lyrics to LRCLIB with proof-of-work token.
-        
+
         Calls POST /api/publish with header X-Publish-Token: {prefix}:{nonce}.
         Returns True if successful, False otherwise.
         """

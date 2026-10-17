@@ -1,9 +1,9 @@
 """Tests for lyrics applier engine (sidecar .lrc files and embedded audio tags)."""
 
+import wave
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
-import wave
 
 from mutagen.flac import FLAC
 from mutagen.mp3 import MP3

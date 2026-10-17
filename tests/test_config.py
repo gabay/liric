@@ -1,12 +1,11 @@
 """Tests for configuration management."""
 
 from pathlib import Path
+
 import pytest
 import yaml
 
 from liric.config import (
-    ALLOWED_STORE_MODES,
-    ALLOWED_WHICH_LYRICS,
     DEFAULT_CONFIG_PATH,
     DEFAULT_DB_PATH,
     Config,

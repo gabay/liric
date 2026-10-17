@@ -1,12 +1,11 @@
 """Tests for liric.watcher module."""
 
-from pathlib import Path
 import threading
 import time
-from unittest.mock import MagicMock, patch
-import pytest
+from pathlib import Path
+from unittest.mock import MagicMock
 
-from watchdog.events import FileCreatedEvent, FileModifiedEvent, FileMovedEvent
+from watchdog.events import FileCreatedEvent
 
 from liric.config import Config
 from liric.db import Database, TrackRecord

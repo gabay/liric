@@ -1,8 +1,9 @@
 """Tests for liric CLI commands."""
 
 from pathlib import Path
-from click.testing import CliRunner
+
 import pytest
+from click.testing import CliRunner
 
 from liric.cli import main
 from liric.config import Config, load_config, save_config
@@ -50,6 +51,7 @@ def test_review_cli_help(runner: CliRunner) -> None:
 
 def test_interactive_cli_dry_run(runner: CliRunner, tmp_path: Path) -> None:
     from unittest.mock import patch
+
     from liric.interactive import ReviewSummary
 
     db_file = tmp_path / "interactive_dry.db"
@@ -84,6 +86,7 @@ def test_interactive_cli_dry_run(runner: CliRunner, tmp_path: Path) -> None:
 
 def test_review_cli_options(runner: CliRunner, tmp_path: Path) -> None:
     from unittest.mock import patch
+
     from liric.interactive import ReviewSummary
 
     db_file = tmp_path / "review_opt.db"
@@ -164,14 +167,19 @@ def test_configure_alias(runner: CliRunner, tmp_path: Path) -> None:
 
 def test_init_interactive(runner: CliRunner, tmp_path: Path) -> None:
     cfg_file = tmp_path / "interactive.yaml"
-    user_inputs = "\n".join([
-        str(tmp_path / "music"),      # Music library directory
-        str(tmp_path / "custom.db"),  # SQLite database path
-        "synced_only",                # Lyrics preference
-        "both",                       # Store mode
-        "3",                          # Parallelism
-        "my_secret_key",              # API key
-    ]) + "\n"
+    user_inputs = (
+        "\n".join(
+            [
+                str(tmp_path / "music"),  # Music library directory
+                str(tmp_path / "custom.db"),  # SQLite database path
+                "synced_only",  # Lyrics preference
+                "both",  # Store mode
+                "3",  # Parallelism
+                "my_secret_key",  # API key
+            ]
+        )
+        + "\n"
+    )
 
     result = runner.invoke(main, ["-c", str(cfg_file), "init", "--interactive"], input=user_inputs)
     assert result.exit_code == 0
@@ -656,6 +664,7 @@ def test_run_cli_dry_run(runner: CliRunner, tmp_path: Path) -> None:
 
 def test_run_cli_normal_run(runner: CliRunner, tmp_path: Path) -> None:
     from unittest.mock import patch
+
     from tests.test_applier import create_dummy_mp3
 
     music_dir = tmp_path / "music"

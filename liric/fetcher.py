@@ -1,8 +1,8 @@
 """Lyrics fetcher engine for searching, matching, and enriching track records from LRCLIB."""
 
+import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-import json
 from typing import Any, Optional
 
 from rich.console import Console
@@ -64,7 +64,7 @@ def _process_track(
     config: Config,
 ) -> tuple[TrackRecord, str]:
     """Fetch and score lyrics candidates for a single track.
-    
+
     Returns (track, status) where status is 'found', 'not_found', or 'error'.
     """
     try:
@@ -203,9 +203,7 @@ def fetch_lyrics_for_library(
                     total=len(target_tracks),
                 )
                 with ThreadPoolExecutor(max_workers=workers) as executor:
-                    future_to_track = {
-                        executor.submit(_run_worker, track): track for track in target_tracks
-                    }
+                    future_to_track = {executor.submit(_run_worker, track): track for track in target_tracks}
                     for future in as_completed(future_to_track):
                         try:
                             processed_track, status = future.result()
@@ -228,9 +226,7 @@ def fetch_lyrics_for_library(
                         progress.advance(task_id)
         else:
             with ThreadPoolExecutor(max_workers=workers) as executor:
-                future_to_track = {
-                    executor.submit(_run_worker, track): track for track in target_tracks
-                }
+                future_to_track = {executor.submit(_run_worker, track): track for track in target_tracks}
                 for future in as_completed(future_to_track):
                     try:
                         processed_track, status = future.result()

@@ -1,14 +1,14 @@
 """Tests for directory scanning and database synchronization."""
 
 import os
-from pathlib import Path
 import time
 import wave
+from pathlib import Path
 
 import pytest
 
 from liric.db import Database
-from liric.scanner import ScanSummary, scan_directory
+from liric.scanner import scan_directory
 
 
 def create_dummy_wav(path: Path, duration_seconds: float = 1.0) -> Path:
@@ -105,7 +105,7 @@ def test_scan_directory_skipping_unchanged(test_db: Database, tmp_path: Path) ->
 def test_scan_directory_updating_modified_track(test_db: Database, tmp_path: Path) -> None:
     music_dir = tmp_path / "music"
     file1 = create_dummy_wav(music_dir / "Artist A - Track 1.wav")
-    file2 = create_dummy_wav(music_dir / "Artist B - Track 2.wav")
+    create_dummy_wav(music_dir / "Artist B - Track 2.wav")
 
     # Initial scan
     scan_directory(music_dir, test_db, dry_run=False, show_progress=False)
@@ -132,9 +132,9 @@ def test_scan_directory_updating_modified_track(test_db: Database, tmp_path: Pat
 
 def test_scan_directory_lyrics_stats(test_db: Database, tmp_path: Path) -> None:
     music_dir = tmp_path / "music"
-    f1 = create_dummy_wav(music_dir / "synced_track.wav")
-    f2 = create_dummy_wav(music_dir / "plain_track.wav")
-    f3 = create_dummy_wav(music_dir / "no_lyrics_track.wav")
+    create_dummy_wav(music_dir / "synced_track.wav")
+    create_dummy_wav(music_dir / "plain_track.wav")
+    create_dummy_wav(music_dir / "no_lyrics_track.wav")
 
     # Add synced .lrc
     (music_dir / "synced_track.lrc").write_text("[00:01.00] Synced line\n")
@@ -149,9 +149,7 @@ def test_scan_directory_lyrics_stats(test_db: Database, tmp_path: Path) -> None:
     assert summary.with_no_lyrics == 1
 
 
-def test_scan_directory_subdirectories_and_hidden_files(
-    test_db: Database, tmp_path: Path
-) -> None:
+def test_scan_directory_subdirectories_and_hidden_files(test_db: Database, tmp_path: Path) -> None:
     music_dir = tmp_path / "nested_music"
     create_dummy_wav(music_dir / "Genre1" / "Album1" / "Artist - Song1.wav")
     create_dummy_wav(music_dir / "Genre2" / "Album2" / "Artist - Song2.wav")
@@ -172,7 +170,7 @@ def test_scan_failed_files(test_db: Database, tmp_path: Path) -> None:
     corrupt_file = music_dir / "bad.mp3"
     corrupt_file.write_text("not real audio content")
 
-    valid_file = create_dummy_wav(music_dir / "valid.wav")
+    create_dummy_wav(music_dir / "valid.wav")
 
     summary = scan_directory(music_dir, test_db, show_progress=False)
     assert summary.total_scanned == 2

@@ -12,3 +12,4 @@ tests
 *.yml
 Dockerfile
 .dockerignore
+deploy.sh

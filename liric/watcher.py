@@ -1,9 +1,9 @@
 """Real-time directory watcher and automatic lyrics enrichment handler using watchdog."""
 
-from datetime import datetime, timezone
-from pathlib import Path
 import threading
 import time
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import override
 
 from rich.console import Console
@@ -84,9 +84,7 @@ def process_single_file(
                 track.fetch_status = "error"
                 db.upsert_track(track)
             if console:
-                console.print(
-                    f"[red]✗ Error fetching lyrics for {track.track_name} - {track.artist_name}: {exc}[/red]"
-                )
+                console.print(f"[red]✗ Error fetching lyrics for {track.track_name} - {track.artist_name}: {exc}[/red]")
             return False
 
         if status == "found":
@@ -136,18 +134,14 @@ def process_single_file(
             if not dry_run:
                 db.upsert_track(track)
             if console:
-                console.print(
-                    f"[yellow]• Lyrics not found for {track.track_name} - {track.artist_name}[/yellow]"
-                )
+                console.print(f"[yellow]• Lyrics not found for {track.track_name} - {track.artist_name}[/yellow]")
             return False
 
         else:  # status == "error"
             if not dry_run:
                 db.upsert_track(track)
             if console:
-                console.print(
-                    f"[red]✗ Error fetching lyrics for {track.track_name} - {track.artist_name}[/red]"
-                )
+                console.print(f"[red]✗ Error fetching lyrics for {track.track_name} - {track.artist_name}[/red]")
             return False
 
     finally:

@@ -1,7 +1,5 @@
 """Unit tests for liric.matcher candidate scoring and selection."""
 
-import pytest
-
 from liric.db import TrackRecord
 from liric.matcher import (
     compute_duration_score,

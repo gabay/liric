@@ -41,7 +41,7 @@ def string_similarity(s1: Optional[str], s2: Optional[str]) -> float:
 
 def compute_duration_score(d1: Optional[float], d2: Optional[float]) -> float:
     """Compute score based on duration delta between track and candidate.
-    
+
     diff <= 2s gives high score (1.0).
     diff > 10s receives a penalty.
     """
@@ -68,7 +68,7 @@ def score_candidate(
     which_lyrics: str = "prefer_synced",
 ) -> float:
     """Score a candidate track against a TrackRecord based on metadata and lyrics preference.
-    
+
     Returns confidence score between 0.0 and 1.0.
     """
     has_synced = bool(candidate.get("syncedLyrics"))
@@ -113,18 +113,9 @@ def score_candidate(
 
     if track.album_name and cand_album:
         sim_album = string_similarity(track.album_name, cand_album)
-        base_score = (
-            0.45 * sim_title
-            + 0.35 * sim_artist
-            + 0.15 * sim_duration
-            + 0.05 * sim_album
-        )
+        base_score = 0.45 * sim_title + 0.35 * sim_artist + 0.15 * sim_duration + 0.05 * sim_album
     else:
-        base_score = (
-            0.50 * sim_title
-            + 0.35 * sim_artist
-            + 0.15 * sim_duration
-        )
+        base_score = 0.50 * sim_title + 0.35 * sim_artist + 0.15 * sim_duration
 
     # Penalize if title or artist is a strong mismatch
     if sim_title < 0.2 or sim_artist < 0.2:
@@ -140,7 +131,7 @@ def select_best_candidate(
     which_lyrics: str = "prefer_synced",
 ) -> tuple[Optional[dict[str, Any]], float]:
     """Select candidate with highest confidence score for the given track.
-    
+
     Returns (best_candidate, confidence). If no suitable candidate is found, returns (None, 0.0).
     """
     if not candidates:

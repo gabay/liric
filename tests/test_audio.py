@@ -1,13 +1,12 @@
 """Tests for audio file handling and metadata extraction."""
 
+import wave
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-import wave
 
 from mutagen.id3 import ID3, SYLT, TALB, TIT2, TPE1, TXXX, USLT
 
 from liric.audio import (
-    AudioMetadata,
     extract_audio_metadata,
     is_audio_file,
     is_synced_lrc_content,

@@ -1,9 +1,9 @@
 """Interactive review mode and instrumental publishing for liric."""
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import json
 from typing import Any, Optional
 
 import click
@@ -71,15 +71,11 @@ def publish_instrumental_to_lrclib(
         published = client.publish_lyrics(payload, prefix, nonce)
         if published:
             if console:
-                console.print(
-                    f"[green]Published instrumental marker to LRCLIB for '{track.track_name}'.[/green]"
-                )
+                console.print(f"[green]Published instrumental marker to LRCLIB for '{track.track_name}'.[/green]")
             return True
         else:
             if console:
-                console.print(
-                    f"[red]Failed to publish instrumental marker to LRCLIB for '{track.track_name}'.[/red]"
-                )
+                console.print(f"[red]Failed to publish instrumental marker to LRCLIB for '{track.track_name}'.[/red]")
             return False
     except Exception as exc:
         if console:
@@ -179,9 +175,7 @@ def review_library(
                     candidates = []
 
             # Fallback if track already has lyrics/instrumental but candidates_json was empty
-            if not candidates and (
-                track.plain_lyrics or track.synced_lyrics or track.is_instrumental
-            ):
+            if not candidates and (track.plain_lyrics or track.synced_lyrics or track.is_instrumental):
                 candidates = [
                     {
                         "id": track.lrclib_id,
@@ -222,9 +216,7 @@ def review_library(
                                 else ("Plain" if cand.get("plainLyrics") else "None")
                             )
                         )
-                        console.print(
-                            f"    [{c_idx}] {c_name} by {c_artist} ({c_album}) [{c_dur}] [{c_type}]"
-                        )
+                        console.print(f"    [{c_idx}] {c_name} by {c_artist} ({c_album}) [{c_dur}] [{c_type}]")
                         preview = ""
                         synced = cand.get("syncedLyrics")
                         plain = cand.get("plainLyrics")
@@ -236,18 +228,14 @@ def review_library(
                             ]
                             preview = " / ".join(lines[:3])
                         elif isinstance(plain, str) and plain:
-                            lines = [
-                                line.strip()
-                                for line in plain.splitlines()
-                                if line.strip()
-                            ]
+                            lines = [line.strip() for line in plain.splitlines() if line.strip()]
                             preview = " / ".join(lines[:3])
                         elif cand.get("instrumental"):
                             preview = "[Instrumental]"
                         if preview:
                             if len(preview) > 120:
                                 preview = f"{preview[:120]}..."
-                            console.print(f"        [dim]\"{preview}\"[/dim]")
+                            console.print(f'        [dim]"{preview}"[/dim]')
                 else:
                     console.print("  [dim]No candidates available.[/dim]")
 
@@ -255,9 +243,7 @@ def review_library(
                 has_candidates = bool(candidates)
                 if has_candidates:
                     choices = ["a", "s", "r", "m", "i"]
-                    prompt_label = (
-                        "Action: [A]ccept, [S]kip, [R]eject, [M]anual search, [I]nstrumental"
-                    )
+                    prompt_label = "Action: [A]ccept, [S]kip, [R]eject, [M]anual search, [I]nstrumental"
                 else:
                     choices = ["s", "r", "m", "i"]
                     prompt_label = "Action: [S]kip, [R]eject, [M]anual search, [I]nstrumental"
@@ -267,15 +253,9 @@ def review_library(
 
                 # 1. Accept
                 if (action in ("a", "accept") and has_candidates) or (
-                    action.isdigit()
-                    and has_candidates
-                    and 1 <= int(action) <= len(candidates)
+                    action.isdigit() and has_candidates and 1 <= int(action) <= len(candidates)
                 ):
-                    chosen_cand = (
-                        candidates[int(action) - 1]
-                        if action.isdigit()
-                        else candidates[0]
-                    )
+                    chosen_cand = candidates[int(action) - 1] if action.isdigit() else candidates[0]
                     cand_id = chosen_cand.get("id")
                     track.lrclib_id = int(cand_id) if cand_id is not None else None
                     plain_val = chosen_cand.get("plainLyrics")
@@ -327,9 +307,7 @@ def review_library(
                         True,
                     )
                     if should_publish and not dry_run:
-                        if publish_instrumental_to_lrclib(
-                            track, api_client, console=console
-                        ):
+                        if publish_instrumental_to_lrclib(track, api_client, console=console):
                             summary.published_to_lrclib += 1
 
                     if auto_apply and not dry_run:
@@ -342,9 +320,7 @@ def review_library(
                 # 5. Manual search
                 elif action in ("m", "manual", "search"):
                     default_query = f"{track.artist_name} {track.track_name}".strip()
-                    query = ask_input(
-                        f"Enter search query (default: {default_query}): "
-                    ).strip()
+                    query = ask_input(f"Enter search query (default: {default_query}): ").strip()
                     if not query:
                         query = default_query
 
@@ -378,13 +354,11 @@ def review_library(
                                     else ("Plain" if res.get("plainLyrics") else "None")
                                 )
                             )
-                            console.print(
-                                f"    [{r_idx}] {r_name} by {r_artist} ({r_album}) [{r_dur}] [{r_type}]"
-                            )
+                            console.print(f"    [{r_idx}] {r_name} by {r_artist} ({r_album}) [{r_dur}] [{r_type}]")
 
-                    pick_str = ask_input(
-                        f"Select candidate [1-{min(5, len(results))}], or 0/c to cancel: "
-                    ).strip().lower()
+                    pick_str = (
+                        ask_input(f"Select candidate [1-{min(5, len(results))}], or 0/c to cancel: ").strip().lower()
+                    )
                     if pick_str in ("0", "c", "cancel", ""):
                         if console:
                             console.print("[dim]Manual search cancelled.[/dim]")

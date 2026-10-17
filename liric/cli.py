@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Optional
+
 import click
 from rich.console import Console
 from rich.table import Table
@@ -18,7 +19,7 @@ from liric.config import (
 from liric.db import Database
 from liric.fetcher import FetchSummary, fetch_lyrics_for_library
 from liric.interactive import ReviewSummary, review_library
-from liric.runner import PipelineSummary, run_pipeline
+from liric.runner import run_pipeline
 from liric.scanner import ScanSummary, scan_directory
 from liric.watcher import watch_folder
 
@@ -140,9 +141,7 @@ def format_review_table(summary: ReviewSummary, dry_run: bool = False) -> Table:
     return table
 
 
-def _handle_init(
-    ctx: click.Context, interactive: bool, force: bool
-) -> None:
+def _handle_init(ctx: click.Context, interactive: bool, force: bool) -> None:
     config_path = ctx.obj.get("config_path") if ctx.obj else None
     target = resolve_config_path(config_path)
 
@@ -227,9 +226,7 @@ def clean_cmd(ctx: click.Context, dry_run: bool, yes: bool) -> None:
     with Database(cfg.db_path) as db:
         if dry_run:
             count = db.clean(dry_run=True)
-            console.print(
-                f"[yellow]Dry run: {count} track(s) would be removed from the database.[/yellow]"
-            )
+            console.print(f"[yellow]Dry run: {count} track(s) would be removed from the database.[/yellow]")
             return
 
         count = db.count_tracks()
@@ -238,16 +235,12 @@ def clean_cmd(ctx: click.Context, dry_run: bool, yes: bool) -> None:
             return
 
         if not yes:
-            if not click.confirm(
-                f"Are you sure you want to remove {count} track(s) from the database?"
-            ):
+            if not click.confirm(f"Are you sure you want to remove {count} track(s) from the database?"):
                 console.print("[yellow]Clean operation aborted.[/yellow]")
                 return
 
         deleted = db.clean(dry_run=False)
-        console.print(
-            f"[green]Successfully removed {deleted} track(s) from the database.[/green]"
-        )
+        console.print(f"[green]Successfully removed {deleted} track(s) from the database.[/green]")
 
 
 @main.command("scan", help="Scan music directory for audio files and populate database.")
@@ -271,15 +264,11 @@ def scan_cmd(ctx: click.Context, folder: Optional[str], dry_run: bool) -> None:
     target_path = Path(target_str).expanduser().resolve()
 
     if not target_path.exists() or not target_path.is_dir():
-        console.print(
-            f"[red]Error: Music directory '{target_str}' does not exist or is not a directory.[/red]"
-        )
+        console.print(f"[red]Error: Music directory '{target_str}' does not exist or is not a directory.[/red]")
         ctx.exit(1)
 
     if dry_run:
-        console.print(
-            f"[yellow]Dry-run mode: scanning '{target_path}' (no database changes will be saved)...[/yellow]"
-        )
+        console.print(f"[yellow]Dry-run mode: scanning '{target_path}' (no database changes will be saved)...[/yellow]")
     else:
         console.print(f"[bold cyan]Scanning music directory:[/bold cyan] {target_path}")
 
@@ -331,9 +320,7 @@ def fetch_cmd(
         cfg = Config()
 
     if dry_run:
-        console.print(
-            "[yellow]Dry-run mode: fetching lyrics without saving changes to the database...[/yellow]"
-        )
+        console.print("[yellow]Dry-run mode: fetching lyrics without saving changes to the database...[/yellow]")
     else:
         console.print("[bold cyan]Fetching lyrics from LRCLIB...[/bold cyan]")
 
@@ -387,9 +374,7 @@ def apply_cmd(
         cfg = Config()
 
     if dry_run:
-        console.print(
-            "[yellow]Dry-run mode: applying lyrics without modifying files or database...[/yellow]"
-        )
+        console.print("[yellow]Dry-run mode: applying lyrics without modifying files or database...[/yellow]")
     else:
         console.print("[bold cyan]Applying lyrics to music library...[/bold cyan]")
 
@@ -440,9 +425,7 @@ def watch_cmd(
     target_path = Path(target_str).expanduser().resolve()
 
     if not target_path.exists() or not target_path.is_dir():
-        console.print(
-            f"[red]Error: Music directory '{target_str}' does not exist or is not a directory.[/red]"
-        )
+        console.print(f"[red]Error: Music directory '{target_str}' does not exist or is not a directory.[/red]")
         ctx.exit(1)
 
     if dry_run:
@@ -507,9 +490,7 @@ def run_cmd(
     target_path = Path(target_str).expanduser().resolve()
 
     if not target_path.exists() or not target_path.is_dir():
-        console.print(
-            f"[red]Error: Music directory '{target_str}' does not exist or is not a directory.[/red]"
-        )
+        console.print(f"[red]Error: Music directory '{target_str}' does not exist or is not a directory.[/red]")
         ctx.exit(1)
 
     if dry_run:
@@ -551,9 +532,7 @@ def _handle_interactive(
         cfg = Config()
 
     if dry_run:
-        console.print(
-            "[yellow]Dry-run mode: reviewing tracks without saving changes to files or database...[/yellow]"
-        )
+        console.print("[yellow]Dry-run mode: reviewing tracks without saving changes to files or database...[/yellow]")
     else:
         console.print("[bold cyan]Starting interactive lyrics review...[/bold cyan]")
 

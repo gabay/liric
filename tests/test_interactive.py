@@ -238,9 +238,7 @@ def test_review_library_reject(temp_db: Database) -> None:
     assert updated.is_instrumental is False
 
 
-def test_review_library_mark_instrumental_and_publish(
-    temp_db: Database, tmp_path: Path
-) -> None:
+def test_review_library_mark_instrumental_and_publish(temp_db: Database, tmp_path: Path) -> None:
     audio_file = tmp_path / "ambient.mp3"
     audio_file.write_bytes(b"dummy audio")
 
@@ -291,9 +289,7 @@ def test_review_library_mark_instrumental_and_publish(
     assert "[au: instrumental]" in lrc_path.read_text(encoding="utf-8")
 
 
-def test_review_library_mark_instrumental_decline_publish(
-    temp_db: Database, tmp_path: Path
-) -> None:
+def test_review_library_mark_instrumental_decline_publish(temp_db: Database, tmp_path: Path) -> None:
     audio_file = tmp_path / "sound.mp3"
     audio_file.write_bytes(b"dummy audio")
 
@@ -393,9 +389,7 @@ def test_review_library_manual_search_cancelled_then_skip(temp_db: Database) -> 
     temp_db.upsert_track(track)
 
     mock_client = MagicMock(spec=LrclibClient)
-    mock_client.search_lyrics.return_value = [
-        {"id": 1, "trackName": "Irrelevant", "artistName": "Artist"}
-    ]
+    mock_client.search_lyrics.return_value = [{"id": 1, "trackName": "Irrelevant", "artistName": "Artist"}]
 
     # First prompt: "m", search query: "query", pick: "c" (cancel)
     # Second prompt: "s" (skip)
@@ -417,9 +411,7 @@ def test_review_library_manual_search_cancelled_then_skip(temp_db: Database) -> 
     assert summary.accepted == 0
 
 
-def test_review_library_dry_run_does_not_modify_db_or_files_or_publish(
-    temp_db: Database, tmp_path: Path
-) -> None:
+def test_review_library_dry_run_does_not_modify_db_or_files_or_publish(temp_db: Database, tmp_path: Path) -> None:
     audio_1 = tmp_path / "dry1.mp3"
     audio_1.write_bytes(b"audio 1")
     audio_2 = tmp_path / "dry2.mp3"

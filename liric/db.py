@@ -1,10 +1,10 @@
 """SQLite database manager for liric track metadata and lyrics state."""
 
+import sqlite3
+import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-import sqlite3
-import threading
 from typing import Any
 
 ALLOWED_FETCH_STATUSES = ("pending", "fetched", "not_found", "manual", "error")
@@ -232,9 +232,7 @@ class Database:
         with self._lock:
             cursor = self._conn.cursor()
             if status is not None:
-                cursor.execute(
-                    "SELECT COUNT(*) FROM tracks WHERE fetch_status = ?", (status,)
-                )
+                cursor.execute("SELECT COUNT(*) FROM tracks WHERE fetch_status = ?", (status,))
             else:
                 cursor.execute("SELECT COUNT(*) FROM tracks")
             row = cursor.fetchone()
