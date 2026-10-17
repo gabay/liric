@@ -30,7 +30,7 @@ def test_cli_version(runner: CliRunner) -> None:
 
 @pytest.mark.parametrize(
     "cmd",
-    ["scan", "fetch", "apply", "watch", "run", "interactive", "review"],
+    ["fetch", "apply", "watch", "run", "interactive", "review"],
 )
 def test_placeholder_commands(runner: CliRunner, cmd: str) -> None:
     result = runner.invoke(main, [cmd])
@@ -190,3 +190,80 @@ def test_clean_empty_database(runner: CliRunner, tmp_path: Path) -> None:
     result = runner.invoke(main, ["-c", str(cfg_file), "clean", "--yes"])
     assert result.exit_code == 0
     assert "Database is already empty" in result.output
+
+
+def test_scan_cli_help(runner: CliRunner) -> None:
+    result = runner.invoke(main, ["scan", "--help"])
+    assert result.exit_code == 0
+    assert "Scan music directory for audio files and populate database." in result.output
+    assert "--dry-run" in result.output
+
+
+def test_scan_cli_dry_run(runner: CliRunner, tmp_path: Path) -> None:
+    from tests.test_scanner import create_dummy_wav
+
+    music_dir = tmp_path / "music"
+    create_dummy_wav(music_dir / "Artist - Track.wav")
+
+    db_file = tmp_path / "scan_cli.db"
+    cfg_file = tmp_path / "scan_cli.yaml"
+    save_config(Config(db_path=str(db_file)), cfg_file)
+
+    result = runner.invoke(main, ["-c", str(cfg_file), "scan", str(music_dir), "--dry-run"])
+    assert result.exit_code == 0
+    assert "Dry-run mode" in result.output
+    assert "Scan Summary (Dry Run)" in result.output
+    assert "Total Scanned" in result.output
+
+    # Database must remain untouched
+    with Database(db_file) as db:
+        assert db.count_tracks() == 0
+
+
+def test_scan_cli_normal_run(runner: CliRunner, tmp_path: Path) -> None:
+    from tests.test_scanner import create_dummy_wav
+
+    music_dir = tmp_path / "music"
+    create_dummy_wav(music_dir / "Artist - Song.wav")
+
+    db_file = tmp_path / "scan_cli.db"
+    cfg_file = tmp_path / "scan_cli.yaml"
+    save_config(Config(db_path=str(db_file)), cfg_file)
+
+    result = runner.invoke(main, ["-c", str(cfg_file), "scan", str(music_dir)])
+    assert result.exit_code == 0
+    assert "Scan Summary" in result.output
+    assert "New Tracks" in result.output
+
+    # Tracks must be stored in database
+    with Database(db_file) as db:
+        assert db.count_tracks() == 1
+        track = db.get_all_tracks()[0]
+        assert track.track_name == "Song"
+        assert track.artist_name == "Artist"
+
+
+def test_scan_cli_default_music_dir(runner: CliRunner, tmp_path: Path) -> None:
+    from tests.test_scanner import create_dummy_wav
+
+    music_dir = tmp_path / "default_music"
+    create_dummy_wav(music_dir / "Artist - DefaultSong.wav")
+
+    db_file = tmp_path / "default_scan.db"
+    cfg_file = tmp_path / "default_scan.yaml"
+    save_config(Config(db_path=str(db_file), music_dir=str(music_dir)), cfg_file)
+
+    # Calling scan without FOLDER argument should use music_dir from config
+    result = runner.invoke(main, ["-c", str(cfg_file), "scan"])
+    assert result.exit_code == 0
+    assert "Scan Summary" in result.output
+
+    with Database(db_file) as db:
+        assert db.count_tracks() == 1
+
+
+def test_scan_cli_nonexistent_directory(runner: CliRunner, tmp_path: Path) -> None:
+    nonexistent = tmp_path / "missing_folder"
+    result = runner.invoke(main, ["scan", str(nonexistent)])
+    assert result.exit_code == 1
+    assert "does not exist or is not a directory" in result.output

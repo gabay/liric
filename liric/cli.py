@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 import click
 from rich.console import Console
+from rich.table import Table
 
 from liric import __version__
 from liric.config import (
@@ -14,6 +15,7 @@ from liric.config import (
     resolve_config_path,
 )
 from liric.db import Database
+from liric.scanner import scan_directory
 
 console = Console()
 
@@ -143,11 +145,75 @@ def clean_cmd(ctx: click.Context, dry_run: bool, yes: bool) -> None:
         )
 
 
-# Scaffolding placeholder commands
 @main.command("scan", help="Scan music directory for audio files and populate database.")
+@click.argument("folder", required=False, type=click.Path(file_okay=False, dir_okay=True))
+@click.option(
+    "--dry-run",
+    "-n",
+    is_flag=True,
+    default=False,
+    help="Show scan results without saving to the database.",
+)
 @click.pass_context
-def scan_cmd(ctx: click.Context) -> None:
-    console.print("[yellow]'scan' is not yet implemented in Phase 1.[/yellow]")
+def scan_cmd(ctx: click.Context, folder: Optional[str], dry_run: bool) -> None:
+    config_path = ctx.obj.get("config_path") if ctx.obj else None
+    try:
+        cfg = load_config(config_path)
+    except FileNotFoundError:
+        cfg = Config()
+
+    target_str = folder or cfg.music_dir or "."
+    target_path = Path(target_str).expanduser().resolve()
+
+    if not target_path.exists() or not target_path.is_dir():
+        console.print(
+            f"[red]Error: Music directory '{target_str}' does not exist or is not a directory.[/red]"
+        )
+        ctx.exit(1)
+
+    if dry_run:
+        console.print(
+            f"[yellow]Dry-run mode: scanning '{target_path}' (no database changes will be saved)...[/yellow]"
+        )
+    else:
+        console.print(f"[bold cyan]Scanning music directory:[/bold cyan] {target_path}")
+
+    with Database(cfg.db_path) as db:
+        summary = scan_directory(
+            folder=target_path,
+            db=db,
+            dry_run=dry_run,
+            console=console,
+            show_progress=True,
+        )
+
+    table = Table(
+        title=f"Scan Summary{' (Dry Run)' if dry_run else ''}",
+        show_header=True,
+        header_style="bold magenta",
+    )
+    table.add_column("Metric", style="cyan")
+    table.add_column("Count", justify="right", style="green")
+
+    table.add_row("Total Scanned", str(summary.total_scanned))
+    table.add_row("New Tracks", str(summary.new_tracks))
+    table.add_row("Updated Tracks", str(summary.updated_tracks))
+    table.add_row("Unchanged Tracks", str(summary.unchanged_tracks))
+    table.add_row(
+        "Failed Files",
+        str(summary.failed_files),
+        style="red" if summary.failed_files > 0 else "dim",
+    )
+    table.add_section()
+    table.add_row("With Synced Lyrics", str(summary.with_synced))
+    table.add_row("With Plain Lyrics", str(summary.with_plain))
+    table.add_row(
+        "With No Lyrics",
+        str(summary.with_no_lyrics),
+        style="yellow" if summary.with_no_lyrics > 0 else "green",
+    )
+
+    console.print(table)
 
 
 @main.command("fetch", help="Fetch lyrics from LRCLIB for tracks in the database.")
