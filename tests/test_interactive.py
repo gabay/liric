@@ -154,7 +154,7 @@ def test_review_library_accept_low_confidence(temp_db: Database, tmp_path: Path)
         config=config,
         dry_run=False,
         confidence_threshold=0.85,
-        prompt_func=lambda prompt, choices: "a",
+        prompt_func=lambda prompt, choices, default: "a",
     )
 
     assert summary.reviewed_tracks == 1
@@ -191,7 +191,7 @@ def test_review_library_skip(temp_db: Database) -> None:
         db=temp_db,
         config=config,
         dry_run=False,
-        prompt_func=lambda prompt, choices: "s",
+        prompt_func=lambda prompt, choices, default: "s",
     )
 
     assert summary.reviewed_tracks == 1
@@ -224,7 +224,7 @@ def test_review_library_reject(temp_db: Database) -> None:
         db=temp_db,
         config=config,
         dry_run=False,
-        prompt_func=lambda prompt, choices: "r",
+        prompt_func=lambda prompt, choices, default: "r",
     )
 
     assert summary.reviewed_tracks == 1
@@ -267,7 +267,7 @@ def test_review_library_mark_instrumental_and_publish(temp_db: Database, tmp_pat
         config=config,
         dry_run=False,
         client=mock_client,
-        prompt_func=lambda prompt, choices: "i",
+        prompt_func=lambda prompt, choices, default: "i",
         confirm_func=lambda prompt, default: True,
     )
 
@@ -313,7 +313,7 @@ def test_review_library_mark_instrumental_decline_publish(temp_db: Database, tmp
         config=config,
         dry_run=False,
         client=mock_client,
-        prompt_func=lambda prompt, choices: "i",
+        prompt_func=lambda prompt, choices, default: "i",
         confirm_func=lambda prompt, default: False,
     )
 
@@ -362,7 +362,7 @@ def test_review_library_manual_search(temp_db: Database, tmp_path: Path) -> None
         config=config,
         dry_run=False,
         client=mock_client,
-        prompt_func=lambda prompt, choices: "m",
+        prompt_func=lambda prompt, choices, default: "m",
         input_func=lambda prompt: next(inputs),
     )
 
@@ -405,7 +405,7 @@ def test_review_library_manual_search_cancelled_then_skip(temp_db: Database) -> 
         config=config,
         dry_run=False,
         client=mock_client,
-        prompt_func=lambda p, ch: next(prompts),
+        prompt_func=lambda p, ch, d: next(prompts),
         input_func=lambda p: next(inputs),
     )
 
@@ -465,7 +465,7 @@ def test_review_library_dry_run_does_not_modify_db_or_files_or_publish(temp_db: 
         config=config,
         dry_run=True,
         client=mock_client,
-        prompt_func=lambda p, ch: next(prompts),
+        prompt_func=lambda p, ch, d: next(prompts),
         confirm_func=lambda p, d: True,
     )
 
@@ -531,7 +531,7 @@ def test_review_library_threshold_and_not_found_filtering(temp_db: Database) -> 
         config=config,
         confidence_threshold=0.85,
         include_not_found=False,
-        prompt_func=lambda p, ch: "s",
+        prompt_func=lambda p, ch, d: "s",
     )
     assert summary_no_nf.reviewed_tracks == 1
     assert summary_no_nf.skipped == 1
@@ -542,7 +542,7 @@ def test_review_library_threshold_and_not_found_filtering(temp_db: Database) -> 
         config=config,
         confidence_threshold=0.95,
         include_not_found=False,
-        prompt_func=lambda p, ch: "s",
+        prompt_func=lambda p, ch, d: "s",
     )
     assert summary_high_thresh.reviewed_tracks == 2
     assert summary_high_thresh.skipped == 2
@@ -584,7 +584,7 @@ def test_review_library_pick_candidate_by_number(temp_db: Database, tmp_path: Pa
         db=temp_db,
         config=config,
         dry_run=False,
-        prompt_func=lambda prompt, choices: "2",
+        prompt_func=lambda prompt, choices, default: "2",
     )
 
     assert summary.reviewed_tracks == 1
@@ -640,7 +640,7 @@ def test_review_library_publish_background_user_continues_prompt(temp_db: Databa
 
     track_idx = 0
 
-    def custom_prompt(prompt_label: str, choices: list[str]) -> str:
+    def custom_prompt(prompt_label: str, choices: list[str], default: str) -> str:
         nonlocal track_idx, prompt_2_seen_while_publishing
         track_idx += 1
         if track_idx == 1:
@@ -715,7 +715,7 @@ def test_review_library_publish_output_printed_between_prompts_not_on_top(temp_d
 
     track_counter = 0
 
-    def custom_prompt(prompt_label: str, choices: list[str]) -> str:
+    def custom_prompt(prompt_label: str, choices: list[str], default: str) -> str:
         nonlocal track_counter
         active_prompt.append(prompt_label)
         track_counter += 1
@@ -776,7 +776,7 @@ def test_review_library_publish_waited_on_session_end(temp_db: Database) -> None
         config=config,
         dry_run=False,
         client=mock_client,
-        prompt_func=lambda p, ch: "i",
+        prompt_func=lambda p, ch, d: "i",
         confirm_func=lambda p, d: True,
     )
 
@@ -819,7 +819,7 @@ def test_review_library_publish_waited_on_signal(temp_db: Database) -> None:
 
     prompt_count = 0
 
-    def prompt_raising_sigint(prompt_label: str, choices: list[str]) -> str:
+    def prompt_raising_sigint(prompt_label: str, choices: list[str], default: str) -> str:
         nonlocal prompt_count
         prompt_count += 1
         if prompt_count == 1:
@@ -870,7 +870,7 @@ def test_review_library_publish_background_failure_handled(temp_db: Database) ->
         dry_run=False,
         console=mock_console,
         client=mock_client,
-        prompt_func=lambda p, ch: "i",
+        prompt_func=lambda p, ch, d: "i",
         confirm_func=lambda p, d: True,
     )
 

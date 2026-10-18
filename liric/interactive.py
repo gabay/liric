@@ -96,9 +96,10 @@ def publish_instrumental_to_lrclib(
     return success
 
 
-def _default_prompt(prompt_text: str, choices: list[str]) -> str:
+def _default_prompt(prompt_text: str, choices: list[str], default: str | None) -> str:
     return click.prompt(
         prompt_text,
+        default=default,
         type=click.Choice(choices, case_sensitive=False),
         show_choices=True,
     )
@@ -143,7 +144,7 @@ def review_library(
     auto_apply: bool = True,
     console: Optional[Console] = None,
     client: Optional[LrclibClient] = None,
-    prompt_func: Optional[Callable[[str, list[str]], str]] = None,
+    prompt_func: Optional[Callable[[str, list[str], str], str]] = None,
     confirm_func: Optional[Callable[[str, bool], bool]] = None,
     input_func: Optional[Callable[[str], str]] = None,
     executor: Optional[Executor] = None,
@@ -331,12 +332,14 @@ def review_library(
                 has_candidates = bool(candidates)
                 if has_candidates:
                     choices = ["a", "s", "r", "m", "i"]
+                    default = "s"
                     prompt_label = "Action: [A]ccept, [S]kip, [R]eject, [M]anual search, [I]nstrumental"
                 else:
                     choices = ["s", "r", "m", "i"]
+                    default = "s"
                     prompt_label = "Action: [S]kip, [R]eject, [M]anual search, [I]nstrumental"
 
-                user_input = prompt(prompt_label, choices)
+                user_input = prompt(prompt_label, choices, default)
                 action = user_input.strip().lower()
 
                 # 1. Accept
