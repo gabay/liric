@@ -1,6 +1,9 @@
 """Unit and integration tests for interactive review mode and instrumental publishing."""
 
 import json
+import signal
+import threading
+import time
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -600,3 +603,280 @@ def test_review_library_empty(temp_db: Database) -> None:
     summary = review_library(db=temp_db, config=config)
     assert summary.reviewed_tracks == 0
     assert summary.accepted == 0
+
+
+def test_review_library_publish_background_user_continues_prompt(temp_db: Database) -> None:
+    """User can continue to the next track prompt while publish runs in background."""
+    t1 = TrackRecord(
+        file_path="/music/bg1.mp3",
+        track_name="Background Song 1",
+        artist_name="Artist 1",
+        fetch_status="not_found",
+        confidence=0.0,
+    )
+    t2 = TrackRecord(
+        file_path="/music/bg2.mp3",
+        track_name="Background Song 2",
+        artist_name="Artist 2",
+        fetch_status="not_found",
+        confidence=0.0,
+    )
+    temp_db.upsert_track(t1)
+    temp_db.upsert_track(t2)
+
+    publish_started = threading.Event()
+    publish_proceed = threading.Event()
+    prompt_2_seen_while_publishing = False
+
+    def mock_publish(*args: object, **kwargs: object) -> bool:
+        publish_started.set()
+        _ = publish_proceed.wait(timeout=2.0)
+        return True
+
+    mock_client = MagicMock(spec=LrclibClient)
+    mock_client.request_challenge.return_value = {"prefix": "pref", "target": "targ"}
+    mock_client.solve_challenge.return_value = "123"
+    mock_client.publish_lyrics.side_effect = mock_publish
+
+    track_idx = 0
+
+    def custom_prompt(prompt_label: str, choices: list[str]) -> str:
+        nonlocal track_idx, prompt_2_seen_while_publishing
+        track_idx += 1
+        if track_idx == 1:
+            return "i"
+        elif track_idx == 2:
+            # When prompt 2 is reached, verify that publish 1 started but hasn't proceeded yet
+            if publish_started.is_set():
+                prompt_2_seen_while_publishing = True
+            publish_proceed.set()
+            return "s"
+        return "s"
+
+    config = Config(db_path=str(temp_db.db_path))
+    summary = review_library(
+        db=temp_db,
+        config=config,
+        dry_run=False,
+        client=mock_client,
+        prompt_func=custom_prompt,
+        confirm_func=lambda p, d: True,
+    )
+
+    assert prompt_2_seen_while_publishing is True
+    assert summary.reviewed_tracks == 2
+    assert summary.marked_instrumental == 1
+    assert summary.published_to_lrclib == 1
+    assert summary.skipped == 1
+
+
+def test_review_library_publish_output_printed_between_prompts_not_on_top(temp_db: Database) -> None:
+    """Publish completion message is printed between user prompts, never during an active prompt."""
+    t1 = TrackRecord(
+        file_path="/music/seq1.mp3",
+        track_name="Seq Song 1",
+        artist_name="Artist 1",
+        fetch_status="not_found",
+        confidence=0.0,
+    )
+    t2 = TrackRecord(
+        file_path="/music/seq2.mp3",
+        track_name="Seq Song 2",
+        artist_name="Artist 2",
+        fetch_status="not_found",
+        confidence=0.0,
+    )
+    temp_db.upsert_track(t1)
+    temp_db.upsert_track(t2)
+
+    events: list[tuple[str, str]] = []
+    active_prompt: list[str] = []
+
+    mock_console = MagicMock()
+
+    def record_print(msg: str) -> None:
+        # Check if a prompt is currently active
+        if active_prompt:
+            events.append(("print_during_prompt", str(msg)))
+        else:
+            events.append(("print_between_prompts", str(msg)))
+
+    mock_console.print.side_effect = record_print
+
+    mock_client = MagicMock(spec=LrclibClient)
+    mock_client.request_challenge.return_value = {"prefix": "pref", "target": "targ"}
+    mock_client.solve_challenge.return_value = "123"
+
+    def slow_publish(*args: object, **kwargs: object) -> bool:
+        time.sleep(0.05)
+        return True
+
+    mock_client.publish_lyrics.side_effect = slow_publish
+
+    track_counter = 0
+
+    def custom_prompt(prompt_label: str, choices: list[str]) -> str:
+        nonlocal track_counter
+        active_prompt.append(prompt_label)
+        track_counter += 1
+        time.sleep(0.02)
+        active_prompt.pop()
+        return "i" if track_counter == 1 else "s"
+
+    config = Config(db_path=str(temp_db.db_path))
+    summary = review_library(
+        db=temp_db,
+        config=config,
+        dry_run=False,
+        console=mock_console,
+        client=mock_client,
+        prompt_func=custom_prompt,
+        confirm_func=lambda p, d: True,
+    )
+
+    assert summary.published_to_lrclib == 1
+
+    # Verify that NO publish messages were printed during active prompts
+    prints_during_prompt = [e[1] for e in events if e[0] == "print_during_prompt"]
+    for p in prints_during_prompt:
+        assert "Published instrumental marker" not in p
+
+    # Verify that the publish message WAS printed between prompts
+    prints_between = [e[1] for e in events if e[0] == "print_between_prompts"]
+    assert any("Published instrumental marker" in p for p in prints_between)
+
+
+def test_review_library_publish_waited_on_session_end(temp_db: Database) -> None:
+    """Pending publishes are fully waited on when the review session ends."""
+    t1 = TrackRecord(
+        file_path="/music/wait_end.mp3",
+        track_name="Wait End Song",
+        artist_name="Artist",
+        fetch_status="not_found",
+        confidence=0.0,
+    )
+    temp_db.upsert_track(t1)
+
+    completed = False
+
+    def delayed_publish(*args: object, **kwargs: object) -> bool:
+        nonlocal completed
+        time.sleep(0.1)
+        completed = True
+        return True
+
+    mock_client = MagicMock(spec=LrclibClient)
+    mock_client.request_challenge.return_value = {"prefix": "p", "target": "t"}
+    mock_client.solve_challenge.return_value = "1"
+    mock_client.publish_lyrics.side_effect = delayed_publish
+
+    config = Config(db_path=str(temp_db.db_path))
+    summary = review_library(
+        db=temp_db,
+        config=config,
+        dry_run=False,
+        client=mock_client,
+        prompt_func=lambda p, ch: "i",
+        confirm_func=lambda p, d: True,
+    )
+
+    assert completed is True
+    assert summary.marked_instrumental == 1
+    assert summary.published_to_lrclib == 1
+
+
+def test_review_library_publish_waited_on_signal(temp_db: Database) -> None:
+    """Pending publish is waited on and finished when a signal is received."""
+    t1 = TrackRecord(
+        file_path="/music/sig1.mp3",
+        track_name="Signal Song 1",
+        artist_name="Artist 1",
+        fetch_status="not_found",
+        confidence=0.0,
+    )
+    t2 = TrackRecord(
+        file_path="/music/sig2.mp3",
+        track_name="Signal Song 2",
+        artist_name="Artist 2",
+        fetch_status="not_found",
+        confidence=0.0,
+    )
+    temp_db.upsert_track(t1)
+    temp_db.upsert_track(t2)
+
+    publish_completed = False
+
+    def delayed_publish(*args: object, **kwargs: object) -> bool:
+        nonlocal publish_completed
+        time.sleep(0.1)
+        publish_completed = True
+        return True
+
+    mock_client = MagicMock(spec=LrclibClient)
+    mock_client.request_challenge.return_value = {"prefix": "p", "target": "t"}
+    mock_client.solve_challenge.return_value = "1"
+    mock_client.publish_lyrics.side_effect = delayed_publish
+
+    prompt_count = 0
+
+    def prompt_raising_sigint(prompt_label: str, choices: list[str]) -> str:
+        nonlocal prompt_count
+        prompt_count += 1
+        if prompt_count == 1:
+            return "i"
+        # Simulate SIGINT signal on prompt 2
+        sig_handler = signal.getsignal(signal.SIGINT)
+        assert callable(sig_handler)
+        sig_handler(signal.SIGINT, None)
+        return "s"
+
+    config = Config(db_path=str(temp_db.db_path))
+    with pytest.raises(KeyboardInterrupt):
+        review_library(
+            db=temp_db,
+            config=config,
+            dry_run=False,
+            client=mock_client,
+            prompt_func=prompt_raising_sigint,
+            confirm_func=lambda p, d: True,
+        )
+
+    # Publish must have been waited on and completed
+    assert publish_completed is True
+
+
+def test_review_library_publish_background_failure_handled(temp_db: Database) -> None:
+    """Background publish failure is reported gracefully and does not count as published."""
+    t1 = TrackRecord(
+        file_path="/music/fail.mp3",
+        track_name="Failing Song",
+        artist_name="Artist",
+        fetch_status="not_found",
+        confidence=0.0,
+    )
+    temp_db.upsert_track(t1)
+
+    mock_client = MagicMock(spec=LrclibClient)
+    mock_client.request_challenge.return_value = {"prefix": "p", "target": "t"}
+    mock_client.solve_challenge.return_value = "1"
+    mock_client.publish_lyrics.return_value = False
+
+    mock_console = MagicMock()
+
+    config = Config(db_path=str(temp_db.db_path))
+    summary = review_library(
+        db=temp_db,
+        config=config,
+        dry_run=False,
+        console=mock_console,
+        client=mock_client,
+        prompt_func=lambda p, ch: "i",
+        confirm_func=lambda p, d: True,
+    )
+
+    assert summary.marked_instrumental == 1
+    assert summary.published_to_lrclib == 0
+
+    # Ensure failure message was printed
+    printed_calls = [str(call.args[0]) for call in mock_console.print.call_args_list if call.args]
+    assert any("Failed to publish instrumental marker to LRCLIB" in p for p in printed_calls)

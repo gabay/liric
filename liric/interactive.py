@@ -1,7 +1,11 @@
 """Interactive review mode and instrumental publishing for liric."""
 
 import json
+import signal
+import sys
+import threading
 from collections.abc import Callable
+from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -37,12 +41,15 @@ def format_duration(seconds: float | None) -> str:
     return f"{m}:{s:02d}"
 
 
-def publish_instrumental_to_lrclib(
+def _publish_instrumental_task(
     track: TrackRecord,
     client: LrclibClient,
-    console: Optional[Console] = None,
-) -> bool:
-    """Request a PoW challenge, solve it, and publish an instrumental marker to LRCLIB."""
+) -> tuple[bool, str]:
+    """Request a PoW challenge, solve it, and publish an instrumental marker to LRCLIB.
+
+    Returns a tuple of (success: bool, message: str).
+    Does not print directly to console so output can be deferred between user prompts.
+    """
     try:
         challenge = client.request_challenge()
         prefix = challenge["prefix"]
@@ -70,17 +77,23 @@ def publish_instrumental_to_lrclib(
 
         published = client.publish_lyrics(payload, prefix, nonce)
         if published:
-            if console:
-                console.print(f"[green]Published instrumental marker to LRCLIB for '{track.track_name}'.[/green]")
-            return True
+            return True, f"[green]Published instrumental marker to LRCLIB for '{track.track_name}'.[/green]"
         else:
-            if console:
-                console.print(f"[red]Failed to publish instrumental marker to LRCLIB for '{track.track_name}'.[/red]")
-            return False
+            return False, f"[red]Failed to publish instrumental marker to LRCLIB for '{track.track_name}'.[/red]"
     except Exception as exc:
-        if console:
-            console.print(f"[red]Error publishing instrumental marker: {exc}[/red]")
-        return False
+        return False, f"[red]Error publishing instrumental marker: {exc}[/red]"
+
+
+def publish_instrumental_to_lrclib(
+    track: TrackRecord,
+    client: LrclibClient,
+    console: Optional[Console] = None,
+) -> bool:
+    """Request a PoW challenge, solve it, and publish an instrumental marker to LRCLIB."""
+    success, message = _publish_instrumental_task(track, client)
+    if console:
+        console.print(message)
+    return success
 
 
 def _default_prompt(prompt_text: str, choices: list[str]) -> str:
@@ -133,6 +146,7 @@ def review_library(
     prompt_func: Optional[Callable[[str, list[str]], str]] = None,
     confirm_func: Optional[Callable[[str, bool], bool]] = None,
     input_func: Optional[Callable[[str], str]] = None,
+    executor: Optional[Executor] = None,
 ) -> ReviewSummary:
     """Interactively review low-confidence matches and not-found tracks in library."""
     summary = ReviewSummary()
@@ -159,10 +173,83 @@ def review_library(
     own_client = client is None
     api_client = client or LrclibClient(app_id=config.app_id, api_key=config.api_key)
 
+    own_executor = executor is None
+    pool = executor or ThreadPoolExecutor(max_workers=1)
+    pending_publishes: list[Future[tuple[bool, str]]] = []
+
+    def drain_completed(wait: bool = False) -> None:
+        nonlocal pending_publishes
+        if not pending_publishes:
+            return
+
+        if wait:
+            for fut in pending_publishes:
+                try:
+                    success, msg = fut.result()
+                    if console:
+                        console.print(msg)
+                    if success:
+                        summary.published_to_lrclib += 1
+                except Exception as exc:
+                    if console:
+                        console.print(f"[red]Error publishing instrumental marker: {exc}[/red]")
+            pending_publishes.clear()
+        else:
+            still_pending = []
+            for fut in pending_publishes:
+                if fut.done():
+                    try:
+                        success, msg = fut.result()
+                        if console:
+                            console.print(msg)
+                        if success:
+                            summary.published_to_lrclib += 1
+                    except Exception as exc:
+                        if console:
+                            console.print(f"[red]Error publishing instrumental marker: {exc}[/red]")
+                else:
+                    still_pending.append(fut)
+            pending_publishes = still_pending
+
+    original_handlers: dict[int, Any] = {}
+    is_main_thread = threading.current_thread() is threading.main_thread()
+
+    def _restore_signals() -> None:
+        for sig, h in original_handlers.items():
+            try:
+                signal.signal(sig, h)
+            except (ValueError, AttributeError, OSError):
+                pass
+        original_handlers.clear()
+
+    if is_main_thread:
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                original_handlers[sig] = signal.getsignal(sig)
+
+                def make_handler(signo: int) -> Callable[[int, Any], None]:
+                    def _signal_handler(sig_received: int, frame: Any) -> None:
+                        drain_completed(wait=True)
+                        orig = original_handlers.get(sig_received)
+                        _restore_signals()
+                        if callable(orig) and orig not in (signal.SIG_DFL, signal.SIG_IGN):
+                            orig(sig_received, frame)
+                        elif sig_received == signal.SIGINT:
+                            raise KeyboardInterrupt()
+                        elif sig_received == signal.SIGTERM:
+                            sys.exit(128 + sig_received)
+
+                    return _signal_handler
+
+                signal.signal(sig, make_handler(sig))
+            except (ValueError, AttributeError, OSError):
+                pass
+
     try:
         total = len(tracks_to_review)
         for idx, track in enumerate(tracks_to_review, 1):
             summary.reviewed_tracks += 1
+            drain_completed(wait=False)
 
             # Parse candidates from track
             candidates: list[dict[str, Any]] = []
@@ -240,6 +327,7 @@ def review_library(
                     console.print("  [dim]No candidates available.[/dim]")
 
             while True:
+                drain_completed(wait=False)
                 has_candidates = bool(candidates)
                 if has_candidates:
                     choices = ["a", "s", "r", "m", "i"]
@@ -302,13 +390,14 @@ def review_library(
                     track.fetch_status = "fetched"
                     summary.marked_instrumental += 1
 
+                    drain_completed(wait=False)
                     should_publish = confirm(
-                        "Publish this instrumental marker to LRCLIB? [Y/n]",
+                        "Publish this instrumental marker to LRCLIB?",
                         True,
                     )
                     if should_publish and not dry_run:
-                        if publish_instrumental_to_lrclib(track, api_client, console=console):
-                            summary.published_to_lrclib += 1
+                        fut = pool.submit(_publish_instrumental_task, track, api_client)
+                        pending_publishes.append(fut)
 
                     if auto_apply and not dry_run:
                         _apply_lyrics_and_update_track(track, config)
@@ -320,7 +409,8 @@ def review_library(
                 # 5. Manual search
                 elif action in ("m", "manual", "search"):
                     default_query = f"{track.artist_name} {track.track_name}".strip()
-                    query = ask_input(f"Enter search query (default: {default_query}): ").strip()
+                    drain_completed(wait=False)
+                    query = ask_input(f"Enter search query (default: {default_query})").strip()
                     if not query:
                         query = default_query
 
@@ -356,8 +446,9 @@ def review_library(
                             )
                             console.print(f"    [{r_idx}] {r_name} by {r_artist} ({r_album}) [{r_dur}] [{r_type}]")
 
+                    drain_completed(wait=False)
                     pick_str = (
-                        ask_input(f"Select candidate [1-{min(5, len(results))}], or 0/c to cancel: ").strip().lower()
+                        ask_input(f"Select candidate [1-{min(5, len(results))}], or 0/c to cancel").strip().lower()
                     )
                     if pick_str in ("0", "c", "cancel", ""):
                         if console:
@@ -400,6 +491,10 @@ def review_library(
                     continue
 
     finally:
+        _restore_signals()
+        drain_completed(wait=True)
+        if own_executor:
+            pool.shutdown(wait=True)
         if own_client:
             api_client.close()
 
