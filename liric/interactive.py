@@ -331,7 +331,7 @@ def review_library(
                 drain_completed(wait=False)
                 has_candidates = bool(candidates)
                 if has_candidates:
-                    choices = ["a", "s", "r", "m", "i"]
+                    choices = ["a", "s", "r", "m", "i", *map(str, range(1, len(candidates) + 1))]
                     default = "s"
                     prompt_label = "Action: [A]ccept, [S]kip, [R]eject, [M]anual search, [I]nstrumental"
                 else:
